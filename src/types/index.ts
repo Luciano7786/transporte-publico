@@ -80,3 +80,21 @@ export interface Usuario {
  avisosActivos: boolean;
  tema: Tema;
 }
+
+export interface RespuestaExitosa<T> {
+  datos: T;
+  meta: {
+    total: number;
+    pagina: number;
+    porPagina: number;
+  };
+}
+
+export interface RespuestaError {
+  error: {
+    codigo: string;
+    mensaje: string;
+  };
+}
+
+export type RespuestaApi<T> = RespuestaExitosa<T> | RespuestaError;
