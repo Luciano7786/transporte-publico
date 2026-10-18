@@ -1,9 +1,9 @@
 import { View, Text, StyleSheet } from 'react-native';
 
-export const LinesScreen = () => {
+export default function MapScreen () {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Líneas de Colectivo</Text>
+      <Text style={styles.title}>Mapa de Paradas Cerca</Text>
     </View>
   );
 };

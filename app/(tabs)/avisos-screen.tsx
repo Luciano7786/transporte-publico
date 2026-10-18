@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 
-export const QrScannerScreen = () => {
+export default function QrScannerScreen () {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Escanear QR de Parada</Text>
