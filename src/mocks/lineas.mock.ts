@@ -53,7 +53,40 @@ export const LINEAS_MOCK: Linea[] = [
   linea("4", "Terminal", "Centro", "#15803D", ERSA),
   linea("5", "Puerto Viejo", "San Agustín", "#1B6CA8", MORENO),
   linea("6", "Centro", "Villa Urquiza", "#B91C1C", ERSA),
-  linea("7", "Centro", "Bajada Grande", "#0F766E", MORENO),
+  {
+    id: "lin-07",
+    numero: "7",
+    nombre: "Centro — Bajada Grande",
+    color: "#0F766E",
+    empresa: MORENO,
+    activa: true,
+    recorridos: [
+      {
+        sentido: "ida",
+        destino: "a Bajada Grande",
+        trazado: [
+          { latitud: -31.732, longitud: -60.529 },
+          { latitud: -31.7335, longitud: -60.527 },
+          { latitud: -31.7345, longitud: -60.5255 },
+          { latitud: -31.736, longitud: -60.523 },
+          { latitud: -31.74, longitud: -60.515 },
+          { latitud: -31.748, longitud: -60.495 },
+        ],
+        paradaIds: ["par-102", "par-103", "par-104", "par-109"],
+      },
+      {
+        sentido: "vuelta",
+        destino: "al Centro",
+        trazado: [
+          { latitud: -31.748, longitud: -60.495 },
+          { latitud: -31.743, longitud: -60.512 },
+          { latitud: -31.737, longitud: -60.522 },
+          { latitud: -31.732, longitud: -60.529 },
+        ],
+        paradaIds: ["par-109", "par-104", "par-102"],
+      },
+    ],
+  },
   linea("8", "Centro", "Lomas del Mirador", "#A16207", ERSA),
   linea("9", "Puerto Nuevo", "Centro", "#9A3412", MORENO),
   linea("10", "Centro", "Paraná XIV", "#4338CA", ERSA),
@@ -152,3 +185,34 @@ const responderLista = async <T>(
 
 export const lineasMock = () => responderLista(LINEAS_MOCK, 500);
 export const avisosMock = () => responderLista(AVISOS_MOCK, 400);
+
+export const lineaPorIdMock = async (
+  id: string,
+  demora = 250,
+): Promise<RespuestaApi<Linea>> => {
+  await delay(demora);
+
+  if (mockConfig.escenario === "sin-conexion") {
+    return {
+      error: {
+        codigo: "SIN_CONEXION",
+        mensaje: "No hay conexión. Revisá tu señal e intentá de nuevo.",
+      },
+    };
+  }
+
+  const encontrada = LINEAS_MOCK.find((l) => l.id === id);
+  if (!encontrada) {
+    return {
+      error: {
+        codigo: "LINEA_NO_ENCONTRADA",
+        mensaje: "No existe esa línea.",
+      },
+    };
+  }
+
+  return {
+    datos: encontrada,
+    meta: { total: 1, pagina: 1, porPagina: 1 },
+  };
+};
