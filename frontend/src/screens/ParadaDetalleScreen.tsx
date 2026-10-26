@@ -91,8 +91,8 @@ export function ParadaDetalleScreen() {
         "Confirmación registrada",
         "¡Gracias! Tu confirmación ayuda a los demás pasajeros que están esperando.",
       );
-    } catch {
-      Alert.alert("Error", "No se pudo registrar la confirmación.");
+    } catch (err: any) {
+      Alert.alert("Aviso", err?.message || "No se pudo registrar la confirmación.");
     }
   };
 

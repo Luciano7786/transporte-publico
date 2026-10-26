@@ -1,50 +1,60 @@
-import {
-  confirmarReporteMock,
-  crearReporteMock,
-  reportesPorParadaMock,
-} from "../mocks/reportes.mock";
-import type { MotivoDemora, ReporteDeDemora, RespuestaApi, RespuestaExitosa } from "../types";
-import { ErrorApi } from "./error.service";
+import type { MotivoDemora, ReporteDeDemora, RespuestaExitosa } from "../types";
+import { clienteHttp } from "./cliente";
 
-async function abrirRespuesta<T>(
-  pedir: () => Promise<RespuestaApi<T>>,
-): Promise<RespuestaExitosa<T>> {
-  let respuesta: RespuestaApi<T>;
-
-  try {
-    respuesta = await pedir();
-  } catch {
-    throw new ErrorApi(
-      "SIN_CONEXION",
-      "No hay conexión. Revisá tu señal e intentá de nuevo.",
-    );
-  }
-
-  if ("error" in respuesta) {
-    throw new ErrorApi(respuesta.error.codigo, respuesta.error.mensaje);
-  }
-
-  return respuesta;
-}
-
+/**
+ * Obtiene los reportes de demora recientes (últimos 90 minutos) de una parada.
+ */
 export const obtenerReportesPorParada = (
   paradaId: string,
 ): Promise<RespuestaExitosa<ReporteDeDemora[]>> =>
-  abrirRespuesta(() => reportesPorParadaMock(paradaId));
+  clienteHttp<ReporteDeDemora[]>(
+    `/reportes-demora?paradaId=${encodeURIComponent(paradaId)}`,
+  );
 
+/**
+ * Confirma un reporte de demora existente.
+ */
 export const confirmarReporte = (
   reporteId: string,
 ): Promise<RespuestaExitosa<ReporteDeDemora>> =>
-  abrirRespuesta(() => confirmarReporteMock(reporteId));
+  clienteHttp<ReporteDeDemora>(
+    `/reportes-demora/${encodeURIComponent(reporteId)}/confirmaciones`,
+    {
+      method: "POST",
+    },
+  );
 
+/**
+ * Crea un nuevo reporte de demora.
+ */
 export const crearReporte = (nuevo: {
+  id?: string;
   lineaId: string;
   paradaId: string;
   motivo: MotivoDemora;
-  comentario: string | null;
-  fotoUri: string | null;
-}): Promise<RespuestaExitosa<ReporteDeDemora>> =>
-  abrirRespuesta(() => crearReporteMock(nuevo));
+  comentario?: string | null;
+  fotoUri?: string | null;
+}): Promise<RespuestaExitosa<ReporteDeDemora>> => {
+  // fechaHora actual en formato ISO
+  const payload: Record<string, any> = {
+    lineaId: nuevo.lineaId,
+    paradaId: nuevo.paradaId,
+    motivo: nuevo.motivo,
+    fechaHora: new Date().toISOString(),
+  };
+
+  if (nuevo.id) payload.id = nuevo.id;
+  if (nuevo.comentario?.trim()) payload.comentario = nuevo.comentario.trim();
+  // Sólo mandamos fotoUri si es una URL válida subida al backend
+  if (nuevo.fotoUri && nuevo.fotoUri.startsWith("http")) {
+    payload.fotoUri = nuevo.fotoUri;
+  }
+
+  return clienteHttp<ReporteDeDemora>("/reportes-demora", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
 
 /**
  * Calcula un texto legible del tiempo transcurrido (ej: "hace 15 min").

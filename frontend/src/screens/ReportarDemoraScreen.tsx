@@ -72,8 +72,11 @@ export function ReportarDemoraScreen() {
           },
         ],
       );
-    } catch {
-      Alert.alert("Error", "No se pudo enviar el reporte.");
+    } catch (err: any) {
+      Alert.alert(
+        "No se pudo enviar",
+        err?.message || "Ocurrió un error al enviar el reporte. Verificá que hayas iniciado sesión.",
+      );
     } finally {
       setEnviando(false);
     }

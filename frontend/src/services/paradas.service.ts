@@ -1,41 +1,87 @@
-import { paradaPorIdMock, paradasMock } from "../mocks/paradas.mock";
-import { horariosPorParadaMock } from "../mocks/horarios.mock";
-import type { Horario, Parada, RespuestaApi, RespuestaExitosa } from "../types";
-import { ErrorApi } from "./error.service";
+import type { Horario, Parada, RespuestaExitosa, Sentido } from "../types";
+import { clienteHttp } from "./cliente";
 
-async function abrirRespuesta<T>(
-  pedir: () => Promise<RespuestaApi<T>>,
-): Promise<RespuestaExitosa<T>> {
-  let respuesta: RespuestaApi<T>;
-
-  try {
-    respuesta = await pedir();
-  } catch {
-    throw new ErrorApi(
-      "SIN_CONEXION",
-      "No hay conexión. Revisá tu señal e intentá de nuevo.",
-    );
-  }
-
-  if ("error" in respuesta) {
-    throw new ErrorApi(respuesta.error.codigo, respuesta.error.mensaje);
-  }
-
-  return respuesta;
+export interface FiltrosParadas {
+  q?: string;
+  lineaId?: string;
+  sentido?: Sentido;
+  latitud?: number;
+  longitud?: number;
+  radioMetros?: number;
+  orden?: "nombre" | "distancia";
+  porPagina?: number;
 }
 
-export const obtenerParadas = (): Promise<RespuestaExitosa<Parada[]>> =>
-  abrirRespuesta(paradasMock);
+/**
+ * Obtiene la lista de paradas.
+ * Por defecto pide porPagina=1000 para cargar todas las paradas de la ciudad en memoria.
+ */
+export const obtenerParadas = (
+  filtros?: FiltrosParadas,
+): Promise<RespuestaExitosa<Parada[]>> => {
+  const params = new URLSearchParams();
+  params.set("porPagina", String(filtros?.porPagina ?? 1000));
 
+  if (filtros?.q) params.set("q", filtros.q);
+  if (filtros?.lineaId) params.set("lineaId", filtros.lineaId);
+  if (filtros?.sentido) params.set("sentido", filtros.sentido);
+  if (filtros?.latitud !== undefined) params.set("latitud", String(filtros.latitud));
+  if (filtros?.longitud !== undefined) params.set("longitud", String(filtros.longitud));
+  if (filtros?.radioMetros !== undefined) params.set("radioMetros", String(filtros.radioMetros));
+  if (filtros?.orden) params.set("orden", filtros.orden);
+
+  return clienteHttp<Parada[]>(`/paradas?${params.toString()}`);
+};
+
+/**
+ * Obtiene el detalle de una parada por su ID (ej: "par-101").
+ */
 export const obtenerParadaPorId = (
   id: string,
 ): Promise<RespuestaExitosa<Parada>> =>
-  abrirRespuesta(() => paradaPorIdMock(id));
+  clienteHttp<Parada>(`/paradas/${encodeURIComponent(id)}`);
 
+/**
+ * Resuelve una parada a partir de su código QR (ej: "PARANA:par-101").
+ */
+export const obtenerParadaPorQr = (
+  codigo: string,
+): Promise<RespuestaExitosa<Parada>> =>
+  clienteHttp<Parada>(`/paradas/qr/${encodeURIComponent(codigo)}`);
+
+/**
+ * Obtiene los horarios de tabla para una parada (y opcionalmente una línea o sentido).
+ */
 export const obtenerHorariosPorParada = (
   paradaId: string,
-): Promise<RespuestaExitosa<Horario[]>> =>
-  abrirRespuesta(() => horariosPorParadaMock(paradaId));
+  lineaId?: string,
+  sentido?: Sentido,
+): Promise<RespuestaExitosa<Horario[]>> => {
+  const params = new URLSearchParams();
+  params.set("paradaId", paradaId);
+  params.set("porPagina", "1000");
+  if (lineaId) params.set("lineaId", lineaId);
+  if (sentido) params.set("sentido", sentido);
+
+  return clienteHttp<Horario[]>(`/horarios?${params.toString()}`);
+};
+
+/**
+ * Consulta en la API los próximos pasos de colectivos en una parada dada según la hora actual.
+ */
+export const obtenerProximosHorariosApi = (
+  paradaId: string,
+  cantidad = 3,
+  lineaId?: string,
+): Promise<RespuestaExitosa<Horario[]>> => {
+  const params = new URLSearchParams();
+  params.set("cantidad", String(cantidad));
+  if (lineaId) params.set("lineaId", lineaId);
+
+  return clienteHttp<Horario[]>(
+    `/paradas/${encodeURIComponent(paradaId)}/proximos?${params.toString()}`,
+  );
+};
 
 /**
  * Calcula los próximos horarios de una línea en una parada a partir de una hora de referencia (HH:MM).
@@ -60,7 +106,15 @@ export function calcularProximosHorarios(
     return { proximos: [], finalizoServicio: false };
   }
 
-  const horaRef = horaReferencia ?? "10:34"; // hora de ejemplo de la maqueta
+  // Hora actual del sistema en formato HH:MM si no se especifica
+  let horaRef = horaReferencia;
+  if (!horaRef) {
+    const ahora = new Date();
+    const hh = String(ahora.getHours()).padStart(2, "0");
+    const mm = String(ahora.getMinutes()).padStart(2, "0");
+    horaRef = `${hh}:${mm}`;
+  }
+
   const futuros = horariosLinea.filter((h) => h.hora >= horaRef);
 
   if (futuros.length === 0) {

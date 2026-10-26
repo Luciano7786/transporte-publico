@@ -1,38 +1,33 @@
-import { avisosMock, lineaPorIdMock, lineasMock } from "../mocks/lineas.mock";
-import type { Aviso, Linea, RespuestaApi, RespuestaExitosa } from "../types";
-import { ErrorApi } from "./error.service";
+import type { Aviso, Linea, RespuestaExitosa } from "../types";
+import { clienteHttp } from "./cliente";
 
-async function abrirRespuesta<T>(
-  pedir: () => Promise<RespuestaApi<T>>,
-): Promise<RespuestaExitosa<T>> {
-  let respuesta: RespuestaApi<T>;
-
-  try {
-    respuesta = await pedir();
-  } catch {
-    throw new ErrorApi(
-      "SIN_CONEXION",
-      "No hay conexión. Revisá tu señal e intentá de nuevo.",
-    );
-  }
-
-  if ("error" in respuesta) {
-    throw new ErrorApi(respuesta.error.codigo, respuesta.error.mensaje);
-  }
-
-  return respuesta;
-}
-
+/**
+ * Obtiene todas las líneas de transporte urbano de Paraná.
+ */
 export const obtenerLineas = (): Promise<RespuestaExitosa<Linea[]>> =>
-  abrirRespuesta(lineasMock);
+  clienteHttp<Linea[]>("/lineas");
 
-export const obtenerAvisos = (): Promise<RespuestaExitosa<Aviso[]>> =>
-  abrirRespuesta(avisosMock);
-
+/**
+ * Obtiene el detalle de una línea por su ID (ej: "lin-05").
+ */
 export const obtenerLineaPorId = (
   id: string,
 ): Promise<RespuestaExitosa<Linea>> =>
-  abrirRespuesta(() => lineaPorIdMock(id));
+  clienteHttp<Linea>(`/lineas/${encodeURIComponent(id)}`);
+
+/**
+ * Obtiene la lista de avisos del sistema (vigentes por defecto).
+ */
+export const obtenerAvisos = (
+  estado: "vigentes" | "proximos" | "todos" = "vigentes",
+  lineaId?: string,
+): Promise<RespuestaExitosa<Aviso[]>> => {
+  const params = new URLSearchParams();
+  params.set("estado", estado);
+  if (lineaId) params.set("lineaId", lineaId);
+
+  return clienteHttp<Aviso[]>(`/avisos?${params.toString()}`);
+};
 
 /**
  * Retorna el aviso vigente (desvío o alerta) para una línea dada.
@@ -41,21 +36,13 @@ export async function obtenerAvisoVigentePorLinea(
   lineaId: string,
 ): Promise<Aviso | null> {
   try {
-    const res = await obtenerAvisos();
-    const ahora = new Date().toISOString();
-
-    const vigentes = res.datos.filter((aviso) => {
-      if (!aviso.lineaIds.includes(lineaId)) return false;
-      const empezo = aviso.desde <= ahora;
-      const noVencio = !aviso.hasta || aviso.hasta >= ahora;
-      return empezo && noVencio;
-    });
+    const res = await obtenerAvisos("vigentes", lineaId);
+    if (!res.datos || res.datos.length === 0) return null;
 
     // Priorizamos desvíos sobre informativos
-    const desvio = vigentes.find((a) => a.gravedad === "desvio");
-    return desvio ?? vigentes[0] ?? null;
+    const desvio = res.datos.find((a) => a.gravedad === "desvio");
+    return desvio ?? res.datos[0] ?? null;
   } catch {
     return null;
   }
 }
-
