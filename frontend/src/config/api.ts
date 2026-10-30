@@ -16,3 +16,12 @@ export const API_BASE_URL: string =
     ? "http://10.0.2.2:3000"
     : "http://localhost:3000");
 
+/* para usar ngrok es esto: 
+
+export const API_BASE_URL: string =
+  process.env.EXPO_PUBLIC_API_URL ||
+  (Platform.OS === "android"
+    ? "https://eggnog-rogue-demotion.ngrok-free.dev"
+    : "http://localhost:3000");
+
+ */

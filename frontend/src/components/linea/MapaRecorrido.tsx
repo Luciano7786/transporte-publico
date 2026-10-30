@@ -82,7 +82,7 @@ export const MapaRecorrido: React.FC<MapaRecorridoProps> = ({
   return (
     <View style={styles.container}>
       <View style={[styles.mapWrapper, { borderColor: paleta.borde }]}>
-        <MapView
+      <MapView
           provider={PROVIDER_DEFAULT}
           style={styles.map}
           initialRegion={regionInicial}
