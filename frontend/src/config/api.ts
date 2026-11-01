@@ -10,18 +10,15 @@ declare const process: {
  * Si estás en el emulador de Android: http://10.0.2.2:3000.
  * Si estás en iOS Simulator o Web: http://localhost:3000.
  */
-export const API_BASE_URL: string =
+/**export const API_BASE_URL: string =
   process.env.EXPO_PUBLIC_API_URL ||
   (Platform.OS === "android"
     ? "http://10.0.2.2:3000"
-    : "http://localhost:3000");
-
-/* para usar ngrok es esto: 
+    : "http://localhost:3000");*/
 
 export const API_BASE_URL: string =
   process.env.EXPO_PUBLIC_API_URL ||
   (Platform.OS === "android"
-    ? "https://eggnog-rogue-demotion.ngrok-free.dev"
+    ? " https://garbage-earring-rounding.ngrok-free.dev"
     : "http://localhost:3000");
 
- */

@@ -1,108 +1,128 @@
-import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { AuthContext } from '../contexts/AuthContext';
+import React, { useState, useContext } from "react";
+import { StyleSheet, Text, View, TextInput, TouchableOpacity } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { AuthContext } from "../contexts/AuthContext";
+import { useThemeContext } from "../hooks/use-theme-context";
 
 export default function LoginScreen() {
-    const [email, setEmail] = useState('');
-    const [contrasenia, setContrasenia] = useState('');
-    const [cargando, setCargando] = useState(false);
-
-    // Consumimos la función iniciarSesion del contexto global
+    const { paleta } = useThemeContext();
     const auth = useContext(AuthContext);
+    const navigation = useNavigation<any>();
 
-    const handleIngresar = async () => {
-        if (!email.trim() || !contrasenia.trim()) {
-            Alert.alert('Atención', 'Por favor completa todos los campos.');
-            return;
-        }
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [mostrarPassword, setMostrarPassword] = useState(false);
 
-        if (!auth) return;
-
-        setCargando(true);
+    const handleLogin = async () => {
         try {
-            await auth.iniciarSesion(email, contrasenia);
-            // Nota: Si el inicio de sesión es exitoso, el contexto actualiza el estado 'usuario',
-            // lo cual automáticamente hace que tu navegador detecte que estás logueado y te lleve al Home.
-        } catch (err: any) {
-            Alert.alert('Error al ingresar', err.message || 'Verificá tus credenciales.');
-        } finally {
-            setCargando(false);
+            await auth?.iniciarSesion(email, password);
+            navigation.goBack();
+        } catch (error) {
+            alert("Error al iniciar sesión. Verifique sus credenciales.");
         }
     };
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.titulo}>Transporte Público</Text>
-            <Text style={styles.subtitulo}>Paraná</Text>
+        <SafeAreaView style={[styles.container, { backgroundColor: paleta.fondoApp }]}>
+            <View style={[styles.card, { backgroundColor: paleta.fondoApp, borderColor: paleta.borde || "#ddd" }]}>
+                <Text style={[styles.title, { color: paleta.textoAlto }]}>Iniciar Sesión</Text>
 
-            <TextInput
-                style={styles.input}
-                placeholder="Correo electrónico"
-                placeholderTextColor="#888"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-            />
+                <TextInput
+                    style={[styles.input, { color: paleta.textoAlto, borderColor: paleta.borde || "#ddd" }]}
+                    placeholder="Correo electrónico"
+                    placeholderTextColor="#888"
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                />
 
-            <TextInput
-                style={styles.input}
-                placeholder="Contraseña"
-                placeholderTextColor="#888"
-                value={contrasenia}
-                onChangeText={setContrasenia}
-                secureTextEntry
-            />
+                {/* Campo de contraseña bloqueado por defecto (oculto) */}
+                <View style={[styles.passwordContainer, { borderColor: paleta.borde || "#ddd" }]}>
+                    <TextInput
+                        style={[styles.passwordInput, { color: paleta.textoAlto }]}
+                        placeholder="Contraseña"
+                        placeholderTextColor="#888"
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry={!mostrarPassword} // Bloqueado/oculto por defecto
+                    />
+                    <TouchableOpacity
+                        style={styles.eyeButton}
+                        onPress={() => setMostrarPassword(!mostrarPassword)} // Se desbloquea solo si el usuario lo presiona
+                    >
+                        <Ionicons
+                            name={mostrarPassword ? "eye" : "eye-off"}
+                            size={22}
+                            color={paleta.textoMedio || "#666"}
+                        />
+                    </TouchableOpacity>
+                </View>
 
-            <TouchableOpacity style={styles.boton} onPress={handleIngresar} disabled={cargando}>
-                {cargando ? (
-                    <ActivityIndicator color="#fff" />
-                ) : (
-                    <Text style={styles.botonTexto}>Iniciar Sesión</Text>
-                )}
-            </TouchableOpacity>
-        </View>
+                <TouchableOpacity style={styles.boton} onPress={handleLogin}>
+                    <Text style={styles.botonTexto}>Ingresar</Text>
+                </TouchableOpacity>
+            </View>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        justifyContent: 'center',
+        justifyContent: "center",
+        padding: 20
+    },
+    card: {
         padding: 24,
-        backgroundColor: '#fff',
+        borderRadius: 16,
+        borderWidth: 1,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
     },
-    titulo: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        textAlign: 'center',
-        color: '#1B6CA8',
-    },
-    subtitulo: {
-        fontSize: 16,
-        textAlign: 'center',
-        marginBottom: 32,
-        color: '#666',
+    title: {
+        fontSize: 22,
+        fontWeight: "bold",
+        textAlign: "center",
+        marginBottom: 20
     },
     input: {
-        backgroundColor: '#f9f9f9',
-        padding: 14,
-        borderRadius: 8,
-        marginBottom: 16,
         borderWidth: 1,
-        borderColor: '#ddd',
+        borderRadius: 8,
+        padding: 12,
         fontSize: 16,
+        marginBottom: 16,
+    },
+    passwordContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        borderWidth: 1,
+        borderRadius: 8,
+        marginBottom: 20,
+        paddingHorizontal: 12,
+    },
+    passwordInput: {
+        flex: 1,
+        paddingVertical: 12,
+        fontSize: 16,
+    },
+    eyeButton: {
+        padding: 8,
     },
     boton: {
-        backgroundColor: '#1B6CA8',
-        padding: 16,
+        backgroundColor: "#1B6CA8",
+        padding: 14,
         borderRadius: 8,
-        alignItems: 'center',
-        marginTop: 8,
+        alignItems: "center",
     },
     botonTexto: {
-        color: '#fff',
+        color: "#fff",
         fontSize: 16,
-        fontWeight: 'bold',
+        fontWeight: "bold",
     },
 });
