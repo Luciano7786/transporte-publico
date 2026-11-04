@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const serviceResponse = await iniciarSesionServicio(email, contrasenia);
 
       if ("error" in serviceResponse) {
-        return;
+        throw new Error(serviceResponse.error.mensaje || "Error al iniciar sesión. Verifique sus credenciales.");
       }
 
       const { datos, meta } = serviceResponse;

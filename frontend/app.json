@@ -1,7 +1,5 @@
 {
-
   "expo": {
-
     "name": "transporte-publico",
 
     "slug": "transporte-publico",
@@ -17,15 +15,13 @@
     "userInterfaceStyle": "light",
 
     "ios": {
-
       "supportsTablet": true
-
     },
 
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
 
       "adaptiveIcon": {
-
         "backgroundColor": "#E6F4FE",
 
         "foregroundImage": "",
@@ -33,27 +29,15 @@
         "backgroundImage": "",
 
         "monochromeImage": ""
-
       },
 
       "predictiveBackGestureEnabled": false
-
     },
 
     "web": {
-
       "favicon": ""
-
     },
 
-    "plugins": [
-
-      "expo-sqlite",
-
-      "expo-secure-store"
-
-    ]
-
+    "plugins": ["expo-sqlite", "expo-secure-store"]
   }
-
-} 
+}

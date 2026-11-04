@@ -11,6 +11,7 @@ import { LineaDetalleScreen } from "./src/screens/LineaDetalleScreen";
 import { ParadaDetalleScreen } from "./src/screens/ParadaDetalleScreen";
 import { ReportarDemoraScreen } from "./src/screens/ReportarDemoraScreen";
 import LoginScreen from "./src/screens/LoginScreen";
+import { EscanerQrScreen } from "./src/screens/EscanerQrScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -34,6 +35,7 @@ function MainNavigation() {
           }}
         >
           {/* Pantallas principales siempre accesibles (modo invitado por defecto) */}
+          <Stack.Screen name="EscanearQr" component={EscanerQrScreen} options={{headerShown: false, presentation: 'fullScreenModal'}} />
           <Stack.Screen name="MainTabs" component={TabNavigator} />
           <Stack.Screen name="ParadaDetalle" component={ParadaDetalleScreen} />
           <Stack.Screen name="LineaDetalle" component={LineaDetalleScreen} />
