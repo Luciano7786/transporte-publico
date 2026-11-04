@@ -90,10 +90,11 @@ export function ParadasScreen() {
   }, []);
 
   const handleQrPress = () => {
-    Alert.alert(
-      "Escanear Parada",
-      "Función de escaneo QR (expo-camera) para identificar la parada de manera inmediata.",
-    );
+    navigation.navigate('EscanearQr')
+    // Alert.alert(
+    //   "Escanear Parada",
+    //   "Función de escaneo QR (expo-camera) para identificar la parada de manera inmediata.",
+    // );
   };
 
   const handleParadaPress = (paradaSeleccionada?: Parada) => {

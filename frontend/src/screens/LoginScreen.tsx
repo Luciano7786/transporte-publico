@@ -1,5 +1,5 @@
 import React, { useState, useContext } from "react";
-import { StyleSheet, Text, View, TextInput, TouchableOpacity } from "react-native";
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -18,7 +18,7 @@ export default function LoginScreen() {
     const handleLogin = async () => {
         try {
             await auth?.iniciarSesion(email, password);
-            navigation.goBack();
+            navigation.replace('MainTabs');
         } catch (error) {
             alert("Error al iniciar sesión. Verifique sus credenciales.");
         }
@@ -26,6 +26,10 @@ export default function LoginScreen() {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: paleta.fondoApp }]}>
+              <KeyboardAvoidingView
+            style={{ flex: 1, justifyContent: "center" }}
+                behavior='padding'
+        >
             <View style={[styles.card, { backgroundColor: paleta.fondoApp, borderColor: paleta.borde || "#ddd" }]}>
                 <Text style={[styles.title, { color: paleta.textoAlto }]}>Iniciar Sesión</Text>
 
@@ -65,6 +69,7 @@ export default function LoginScreen() {
                     <Text style={styles.botonTexto}>Ingresar</Text>
                 </TouchableOpacity>
             </View>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }

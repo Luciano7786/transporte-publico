@@ -19,6 +19,6 @@ declare const process: {
 export const API_BASE_URL: string =
   process.env.EXPO_PUBLIC_API_URL ||
   (Platform.OS === "android"
-    ? " https://garbage-earring-rounding.ngrok-free.dev"
+    ? "https://eggnog-rogue-demotion.ngrok-free.dev"
     : "http://localhost:3000");
 
