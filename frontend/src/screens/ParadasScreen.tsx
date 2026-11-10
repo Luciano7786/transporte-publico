@@ -1,5 +1,5 @@
 import { useNavigation } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AvisosHoyCard } from "../components/inicio/AvisosHoyCard";
@@ -10,6 +10,11 @@ import {
   TusParadasCard,
 } from "../components/inicio/TusParadasCard";
 import { useThemeContext } from "../hooks/use-theme-context";
+import {
+  calcularDistanciaMetros,
+  formatearDistancia,
+  useUbicacion,
+} from "../hooks/use-ubicacion";
 import { obtenerAvisos } from "../services/lineas.service";
 import {
   calcularProximosHorarios,
@@ -21,6 +26,7 @@ import type { Aviso, Parada } from "../types";
 export function ParadasScreen() {
   const navigation = useNavigation<any>();
   const { paleta } = useThemeContext();
+  const { coordenadas: usuarioCoords } = useUbicacion();
 
   const [paradas, setParadas] = useState<Parada[]>([]);
   const [avisoDestacado, setAvisoDestacado] = useState<Aviso | null>(null);
@@ -28,6 +34,26 @@ export function ParadasScreen() {
     { numero: "5", color: "#1B6CA8", proximos: ["10:42", "11:02", "11:22"] },
     { numero: "14", color: "#B45309", proximos: ["10:51", "11:21", "11:51"] },
   ]);
+
+  // Calcula la parada más cercana en base a las coordenadas reales del usuario
+  const paradaMasCercana = useMemo(() => {
+    if (paradas.length === 0) return null;
+    let cercana = paradas[0];
+    let menorDist = calcularDistanciaMetros(usuarioCoords, cercana.coordenadas);
+
+    for (let i = 1; i < paradas.length; i++) {
+      const dist = calcularDistanciaMetros(usuarioCoords, paradas[i].coordenadas);
+      if (dist < menorDist) {
+        menorDist = dist;
+        cercana = paradas[i];
+      }
+    }
+
+    return {
+      parada: cercana,
+      distanciaMetros: menorDist,
+    };
+  }, [paradas, usuarioCoords]);
 
   useEffect(() => {
     let activo = true;
@@ -124,10 +150,14 @@ export function ParadasScreen() {
       <InicioHeader titulo="Paraná" onPressQr={handleQrPress} />
 
       <TusParadasCard
-        nombreParada="Alameda y Urquiza"
-        distancia="a 120 m"
+        nombreParada={paradaMasCercana?.parada.nombre ?? "Alameda y Urquiza"}
+        distancia={
+          paradaMasCercana
+            ? formatearDistancia(paradaMasCercana.distanciaMetros)
+            : "a 120 m"
+        }
         lineas={lineasCard}
-        onPress={() => handleParadaPress()}
+        onPress={() => handleParadaPress(paradaMasCercana?.parada)}
       />
 
       <AvisosHoyCard
@@ -139,6 +169,7 @@ export function ParadasScreen() {
       <View style={styles.mapContainer}>
         <MapaInicio
           paradas={paradas}
+          usuarioCoordenadas={usuarioCoords}
           onSelectParada={(p) => handleParadaPress(p)}
         />
       </View>

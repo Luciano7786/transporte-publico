@@ -54,7 +54,7 @@ export function ReportarDemoraScreen() {
   const handleEnviarReporte = async () => {
     try {
       setEnviando(true);
-      await crearReporte({
+      const res = await crearReporte({
         lineaId: lineaSeleccionada,
         paradaId,
         motivo: motivoSeleccionado,
@@ -62,9 +62,13 @@ export function ReportarDemoraScreen() {
         fotoUri,
       });
 
+      const esOffline = res.datos && !res.datos.sincronizado;
+
       Alert.alert(
-        "Reporte enviado",
-        "Tu aviso fue registrado. Los demás pasajeros que esperan en la parada podrán verlo y confirmarlo.",
+        esOffline ? "Guardado sin conexión" : "Reporte enviado",
+        esOffline
+          ? "No hay señal de internet. Tu reporte se guardó localmente y se enviará automáticamente al recuperar conexión."
+          : "Tu aviso fue registrado. Los demás pasajeros que esperan en la parada podrán verlo y confirmarlo.",
         [
           {
             text: "Aceptar",

@@ -1,8 +1,8 @@
-import React from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
+import MapView, { Marker, PROVIDER_DEFAULT, UrlTile } from "react-native-maps";
 import { useThemeContext } from "../../hooks/use-theme-context";
-import type { Parada } from "../../types";
+import type { Coordenadas, Parada } from "../../types";
 
 const DARK_MAP_STYLE = [
   { elementType: "geometry", stylers: [{ color: "#11161b" }] },
@@ -48,28 +48,41 @@ const DARK_MAP_STYLE = [
 
 interface MapaInicioProps {
   paradas?: Parada[];
+  usuarioCoordenadas?: Coordenadas;
   onSelectParada?: (parada: Parada) => void;
 }
 
 export const MapaInicio: React.FC<MapaInicioProps> = ({
   paradas = [],
+  usuarioCoordenadas,
   onSelectParada,
 }) => {
   const { paleta, temaActual } = useThemeContext();
+  const mapRef = useRef<MapView>(null);
 
-  // Coordenadas centrales de Paraná (cerca de Alameda y Urquiza)
-  const regionInicial = {
-    latitude: -31.7333,
-    longitude: -60.5241,
-    latitudeDelta: 0.014,
-    longitudeDelta: 0.014,
-  };
+  // Coordenada del usuario: ubicación GPS real si está disponible, o centro de Paraná
+  const usuarioCoords = useMemo(
+    () => ({
+      latitude: usuarioCoordenadas?.latitud ?? -31.7333,
+      longitude: usuarioCoordenadas?.longitud ?? -60.5241,
+    }),
+    [usuarioCoordenadas?.latitud, usuarioCoordenadas?.longitud],
+  );
 
-  // Coordenada simulada del usuario ("vos")
-  const usuarioCoords = {
-    latitude: -31.7342,
-    longitude: -60.5234,
-  };
+  const region = useMemo(
+    () => ({
+      latitude: usuarioCoords.latitude,
+      longitude: usuarioCoords.longitude,
+      latitudeDelta: 0.014,
+      longitudeDelta: 0.014,
+    }),
+    [usuarioCoords.latitude, usuarioCoords.longitude],
+  );
+
+  // Animar la cámara automáticamente cuando cambian las coordenadas
+  useEffect(() => {
+    mapRef.current?.animateToRegion(region, 500);
+  }, [region]);
 
   // Asigna un color al pin según la parada para que coincida con la imagen de referencia
   const obtenerColorPin = (paradaId: string) => {
@@ -94,13 +107,25 @@ export const MapaInicio: React.FC<MapaInicioProps> = ({
   return (
     <View style={styles.container}>
       <MapView
+        ref={mapRef}
         provider={PROVIDER_DEFAULT}
         style={styles.map}
-        initialRegion={regionInicial}
+        initialRegion={region}
+        onMapReady={() => {
+          mapRef.current?.animateToRegion(region, 500);
+        }}
         customMapStyle={temaActual === "dark" ? DARK_MAP_STYLE : []}
         showsCompass={false}
         showsBuildings={false}
       >
+        {/* Capa de teselas OpenStreetMap para garantizar que las calles se vean sin depender de clave de Google */}
+        <UrlTile
+          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maximumZ={19}
+          flipY={false}
+          zIndex={-1}
+        />
+
         {/* Marcador de ubicación del usuario (punto azul con anillo pulsante) */}
         <Marker
           coordinate={usuarioCoords}

@@ -24,6 +24,12 @@
         {
           "cameraPermission": "Permite acceder a la cámara para escanear el código QR de las paradas."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permite acceder a tu ubicación para mostrarte las paradas más cercanas y calcular las distancias reales."
+        }
       ]
     ]
   }

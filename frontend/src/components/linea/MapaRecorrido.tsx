@@ -1,6 +1,6 @@
 import React from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
+import MapView, { Marker, Polyline, PROVIDER_DEFAULT, UrlTile } from "react-native-maps";
 import { useThemeContext } from "../../hooks/use-theme-context";
 import type { Coordenadas } from "../../types";
 
@@ -90,6 +90,13 @@ export const MapaRecorrido: React.FC<MapaRecorridoProps> = ({
           showsCompass={false}
           showsBuildings={false}
         >
+          <UrlTile
+            urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+            maximumZ={19}
+            flipY={false}
+            zIndex={-1}
+          />
+
           {/* Trazado normal de la línea */}
           {coordsNormales.length > 1 ? (
             <Polyline

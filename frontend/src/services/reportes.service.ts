@@ -1,5 +1,23 @@
+import * as Network from "expo-network";
+import {
+  encolarReporteOffline,
+  limpiarReportesSincronizados,
+  marcarReporteSincronizado,
+  obtenerReportesPendientes,
+} from "../db/database";
 import type { MotivoDemora, ReporteDeDemora, RespuestaExitosa } from "../types";
 import { clienteHttp } from "./cliente";
+import { ErrorApi } from "./error.service";
+
+/**
+ * Determina si el error recibido corresponde a un corte o falta de conexión.
+ */
+function esErrorDeConexion(error: unknown): boolean {
+  return (
+    error instanceof ErrorApi &&
+    (error.codigo === "SIN_CONEXION" || error.codigo === "TIEMPO_AGOTADO")
+  );
+}
 
 /**
  * Obtiene los reportes de demora recientes (últimos 90 minutos) de una parada.
@@ -26,8 +44,10 @@ export const confirmarReporte = (
 
 /**
  * Crea un nuevo reporte de demora.
+ * Estrategia de Resiliencia: si no hay internet (SIN_CONEXION), guarda el reporte
+ * en la tabla local cola_reportes_offline de SQLite para sincronizarlo al recuperar señal.
  */
-export const crearReporte = (nuevo: {
+export const crearReporte = async (nuevo: {
   id?: string;
   lineaId: string;
   paradaId: string;
@@ -35,26 +55,120 @@ export const crearReporte = (nuevo: {
   comentario?: string | null;
   fotoUri?: string | null;
 }): Promise<RespuestaExitosa<ReporteDeDemora>> => {
-  // fechaHora actual en formato ISO
+  const reporteId = nuevo.id ?? `rep-off-${Date.now()}`;
+  const fechaHora = new Date().toISOString();
+
   const payload: Record<string, any> = {
     lineaId: nuevo.lineaId,
     paradaId: nuevo.paradaId,
     motivo: nuevo.motivo,
-    fechaHora: new Date().toISOString(),
+    fechaHora,
   };
 
   if (nuevo.id) payload.id = nuevo.id;
   if (nuevo.comentario?.trim()) payload.comentario = nuevo.comentario.trim();
-  // Sólo mandamos fotoUri si es una URL válida subida al backend
   if (nuevo.fotoUri && nuevo.fotoUri.startsWith("http")) {
     payload.fotoUri = nuevo.fotoUri;
   }
 
-  return clienteHttp<ReporteDeDemora>("/reportes-demora", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  try {
+    const res = await clienteHttp<ReporteDeDemora>("/reportes-demora", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return res;
+  } catch (error) {
+    if (esErrorDeConexion(error)) {
+      // Guardar en cola local offline
+      await encolarReporteOffline({
+        id: reporteId,
+        lineaId: nuevo.lineaId,
+        paradaId: nuevo.paradaId,
+        motivo: nuevo.motivo,
+        comentario: nuevo.comentario ?? null,
+        fechaHora,
+      });
+
+      return {
+        datos: {
+          id: reporteId,
+          lineaId: nuevo.lineaId,
+          paradaId: nuevo.paradaId,
+          usuarioId: "yo",
+          motivo: nuevo.motivo,
+          comentario: nuevo.comentario ?? null,
+          fotoUri: nuevo.fotoUri ?? null,
+          confirmaciones: 0,
+          fechaHora,
+          sincronizado: false,
+        },
+        meta: null,
+      };
+    }
+    throw error;
+  }
 };
+
+/**
+ * Sincroniza los reportes pendientes almacenados en SQLite enviándolos a la API.
+ */
+export async function sincronizarReportesOffline(): Promise<{
+  sincronizados: number;
+  fallidos: number;
+}> {
+  const pendientes = await obtenerReportesPendientes();
+  if (pendientes.length === 0) return { sincronizados: 0, fallidos: 0 };
+
+  let sincronizados = 0;
+  let fallidos = 0;
+
+  for (const rep of pendientes) {
+    try {
+      await clienteHttp<ReporteDeDemora>("/reportes-demora", {
+        method: "POST",
+        body: JSON.stringify({
+          lineaId: rep.lineaId,
+          paradaId: rep.paradaId,
+          motivo: rep.motivo,
+          comentario: rep.comentario,
+          fechaHora: rep.fechaHora,
+        }),
+      });
+
+      await marcarReporteSincronizado(rep.id);
+      sincronizados++;
+    } catch {
+      fallidos++;
+    }
+  }
+
+  if (sincronizados > 0) {
+    await limpiarReportesSincronizados();
+  }
+
+  return { sincronizados, fallidos };
+}
+
+/**
+ * Inicia la escucha automática de estado de red con expo-network para reenviar
+ * reportes pendientes en cuanto se recupera la conexión a internet.
+ */
+export function iniciarEscuchaRedYSincronizacion(): () => void {
+  // Intentar sincronizar al arrancar por si quedaron reportes previos
+  sincronizarReportesOffline().catch(() => {});
+
+  const sub = Network.addNetworkStateListener((state) => {
+    if (state.isConnected && state.isInternetReachable !== false) {
+      sincronizarReportesOffline().catch((err) =>
+        console.warn("Error en sincronización automática offline:", err),
+      );
+    }
+  });
+
+  return () => {
+    sub.remove();
+  };
+}
 
 /**
  * Calcula un texto legible del tiempo transcurrido (ej: "hace 15 min").

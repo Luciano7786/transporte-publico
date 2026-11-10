@@ -1,5 +1,5 @@
 import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -24,12 +24,17 @@ import {
   confirmarReporte,
   obtenerReportesPorParada,
 } from "../services/reportes.service";
+import {
+  calcularDistanciaMetros,
+  useUbicacion,
+} from "../hooks/use-ubicacion";
 import type { Horario, Linea, Parada, ReporteDeDemora } from "../types";
 
 export function ParadaDetalleScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { paleta } = useThemeContext();
+  const { coordenadas: usuarioCoords } = useUbicacion();
 
   const paradaId = route.params?.paradaId ?? "par-101";
 
@@ -42,6 +47,11 @@ export function ParadaDetalleScreen() {
     refugio: true,
     codigoQr: "PARANA:par-101",
   });
+
+  const distanciaTexto = useMemo(() => {
+    const metros = calcularDistanciaMetros(usuarioCoords, parada.coordenadas);
+    return `${metros} m`;
+  }, [usuarioCoords, parada.coordenadas]);
 
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
@@ -167,7 +177,7 @@ export function ParadaDetalleScreen() {
       >
         {/* 2. Barra de orientación y enlace Cómo llegar */}
         <ParadaInfoBar
-          distancia="120 m"
+          distancia={distanciaTexto}
           sentidoTexto="hacia el centro"
           coordenadas={parada.coordenadas}
           nombreParada={parada.nombre}
