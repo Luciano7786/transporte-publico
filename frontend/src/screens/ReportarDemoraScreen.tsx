@@ -1,20 +1,27 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useState } from "react";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  Vibration,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useThemeContext } from "../hooks/use-theme-context";
+import { obtenerLineas } from "../services/lineas.service";
+import { obtenerParadaPorId } from "../services/paradas.service";
 import { crearReporte } from "../services/reportes.service";
-import type { MotivoDemora } from "../types";
+import type { Linea, MotivoDemora, Parada } from "../types";
 
 export function ReportarDemoraScreen() {
   const navigation = useNavigation<any>();
@@ -22,7 +29,10 @@ export function ReportarDemoraScreen() {
   const { paleta } = useThemeContext();
 
   const paradaId = route.params?.paradaId ?? "par-101";
-  const nombreParada = route.params?.nombreParada ?? "Alameda y Urquiza";
+  const nombreParadaInicial = route.params?.nombreParada ?? "Alameda y Urquiza";
+
+  const [parada, setParada] = useState<Parada | null>(null);
+  const [lineasCatalogo, setLineasCatalogo] = useState<Linea[]>([]);
 
   // Estados del formulario
   const [lineaSeleccionada, setLineaSeleccionada] = useState<string>("lin-05");
@@ -32,6 +42,64 @@ export function ReportarDemoraScreen() {
   const [fotoUri, setFotoUri] = useState<string | null>(null);
   const [enviando, setEnviando] = useState<boolean>(false);
 
+  // Estados de la cámara nativa (expo-camera)
+  const [permisoCamara, solicitarPermisoCamara] = useCameraPermissions();
+  const [camaraVisible, setCamaraVisible] = useState<boolean>(false);
+  const [capturandoFoto, setCapturandoFoto] = useState<boolean>(false);
+  const cameraRef = useRef<CameraView>(null);
+
+  useEffect(() => {
+    let activo = true;
+    async function cargarLineasDeParada() {
+      try {
+        const [resParada, resLineas] = await Promise.allSettled([
+          obtenerParadaPorId(paradaId),
+          obtenerLineas(),
+        ]);
+
+        if (!activo) return;
+
+        if (resParada.status === "fulfilled" && resParada.value.datos) {
+          const p = resParada.value.datos;
+          setParada(p);
+          if (p.lineaIds.length > 0 && !p.lineaIds.includes(lineaSeleccionada)) {
+            setLineaSeleccionada(p.lineaIds[0]);
+          }
+        }
+        if (resLineas.status === "fulfilled" && resLineas.value.datos) {
+          setLineasCatalogo(resLineas.value.datos);
+        }
+      } catch {
+        // Fallback silencioso
+      }
+    }
+    cargarLineasDeParada();
+    return () => {
+      activo = false;
+    };
+  }, [paradaId]);
+
+  const nombreParada = parada?.nombre ?? nombreParadaInicial;
+  const idsLineasParada =
+    parada?.lineaIds && parada.lineaIds.length > 0
+      ? parada.lineaIds
+      : ["lin-05", "lin-14"];
+
+  const lineasDisponibles = idsLineasParada.map((id) => {
+    const encontrada = lineasCatalogo.find((l) => l.id === id);
+    return {
+      id,
+      numero: encontrada?.numero ?? id.replace("lin-0", "").replace("lin-", ""),
+      color:
+        encontrada?.color ??
+        (id === "lin-05"
+          ? "#1B6CA8"
+          : id === "lin-14"
+            ? "#B45309"
+            : paleta.acento),
+    };
+  });
+
   const opcionesMotivo: Array<{ id: MotivoDemora; label: string }> = [
     { id: "no_paso", label: "No pasó" },
     { id: "paso_lleno", label: "Pasó lleno y no paró" },
@@ -40,15 +108,85 @@ export function ReportarDemoraScreen() {
     { id: "calle_cortada", label: "Calle cortada" },
   ];
 
-  const handleSacarFoto = () => {
-    // Foto de demostración para emuladores y dispositivos
-    setFotoUri("https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=400");
-    Alert.alert("Cámara", "Foto adjuntada al reporte.");
+  const handleSacarFoto = async () => {
+    try {
+      if (!permisoCamara?.granted) {
+        const res = await solicitarPermisoCamara();
+        if (!res.granted) {
+          Alert.alert(
+            "Permiso requerido",
+            "Necesitamos permiso para usar la cámara y adjuntar la foto del estado de la parada o unidad.",
+          );
+          return;
+        }
+      }
+      setCamaraVisible(true);
+    } catch {
+      Alert.alert("Cámara", "No se pudo abrir la cámara en este dispositivo.");
+    }
+  };
+
+  const handleCapturarFotoCamara = async () => {
+    if (!cameraRef.current || capturandoFoto) return;
+    try {
+      setCapturandoFoto(true);
+      const foto = await cameraRef.current.takePictureAsync({
+        quality: 0.7,
+      });
+      if (foto?.uri) {
+        setFotoUri(foto.uri);
+        Vibration.vibrate(30);
+      }
+      setCamaraVisible(false);
+    } catch {
+      Alert.alert(
+        "Cámara",
+        "No se pudo capturar la imagen. Intentá nuevamente.",
+      );
+    } finally {
+      setCapturandoFoto(false);
+    }
   };
 
   const handleGaleria = () => {
-    setFotoUri("https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=400");
-    Alert.alert("Galería", "Imagen seleccionada.");
+    if (Platform.OS === "web") {
+      const input = (globalThis as any).document?.createElement("input");
+      if (input) {
+        input.type = "file";
+        input.accept = "image/*";
+        input.onchange = (e: any) => {
+          const file = e.target?.files?.[0];
+          if (file) {
+            const url = URL.createObjectURL(file);
+            setFotoUri(url);
+          }
+        };
+        input.click();
+        return;
+      }
+    }
+
+    Alert.alert(
+      "Adjuntar imagen",
+      "Elegí una imagen de referencia o abrí la cámara para tomar una foto actual de la parada:",
+      [
+        {
+          text: "Abrir cámara",
+          onPress: handleSacarFoto,
+        },
+        {
+          text: "Imagen de parada llena",
+          onPress: () =>
+            setFotoUri(
+              "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=400",
+            ),
+        },
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+      ],
+    );
   };
 
   const handleEnviarReporte = async () => {
@@ -62,24 +200,32 @@ export function ReportarDemoraScreen() {
         fotoUri,
       });
 
+      Vibration.vibrate(40);
       const esOffline = res.datos && !res.datos.sincronizado;
 
       Alert.alert(
         esOffline ? "Guardado sin conexión" : "Reporte enviado",
         esOffline
-          ? "No hay señal de internet. Tu reporte se guardó localmente y se enviará automáticamente al recuperar conexión."
+          ? "No hay señal de internet. Tu reporte se guardó localmente en SQLite y se enviará automáticamente al recuperar conexión."
           : "Tu aviso fue registrado. Los demás pasajeros que esperan en la parada podrán verlo y confirmarlo.",
         [
           {
             text: "Aceptar",
-            onPress: () => navigation.goBack(),
+            onPress: () => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate("MainTabs");
+              }
+            },
           },
         ],
       );
     } catch (err: any) {
       Alert.alert(
         "No se pudo enviar",
-        err?.message || "Ocurrió un error al enviar el reporte. Verificá que hayas iniciado sesión.",
+        err?.message ||
+          "Ocurrió un error al enviar el reporte. Verificá que hayas iniciado sesión.",
       );
     } finally {
       setEnviando(false);
@@ -116,71 +262,43 @@ export function ReportarDemoraScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 2. Subtítulo y selector de línea */}
+        {/* 2. Subtítulo y selector dinámico de todas las líneas de la parada */}
         <Text style={[styles.subtitulo, { color: paleta.textoMedio }]}>
           Desde {nombreParada} · ¿qué línea?
         </Text>
 
         <View style={styles.lineasSelectorRow}>
-          {/* Línea 5 */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setLineaSeleccionada("lin-05")}
-            style={[
-              styles.lineaBadge,
-              lineaSeleccionada === "lin-05"
-                ? { backgroundColor: "#1B6CA8" }
-                : {
-                    backgroundColor: paleta.superficie1,
-                    borderColor: paleta.borde,
-                    borderWidth: 1,
-                  },
-            ]}
-          >
-            <Text
-              style={[
-                styles.lineaNumero,
-                {
-                  color:
-                    lineaSeleccionada === "lin-05"
-                      ? "#ffffff"
-                      : paleta.textoBajo,
-                },
-              ]}
-            >
-              5
-            </Text>
-          </TouchableOpacity>
-
-          {/* Línea 14 */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setLineaSeleccionada("lin-14")}
-            style={[
-              styles.lineaBadge,
-              lineaSeleccionada === "lin-14"
-                ? { backgroundColor: "#B45309" }
-                : {
-                    backgroundColor: paleta.superficie1,
-                    borderColor: paleta.borde,
-                    borderWidth: 1,
-                  },
-            ]}
-          >
-            <Text
-              style={[
-                styles.lineaNumero,
-                {
-                  color:
-                    lineaSeleccionada === "lin-14"
-                      ? "#ffffff"
-                      : paleta.textoBajo,
-                },
-              ]}
-            >
-              14
-            </Text>
-          </TouchableOpacity>
+          {lineasDisponibles.map((lineaItem) => {
+            const activa = lineaSeleccionada === lineaItem.id;
+            return (
+              <TouchableOpacity
+                key={lineaItem.id}
+                activeOpacity={0.8}
+                onPress={() => setLineaSeleccionada(lineaItem.id)}
+                style={[
+                  styles.lineaBadge,
+                  activa
+                    ? { backgroundColor: lineaItem.color }
+                    : {
+                        backgroundColor: paleta.superficie1,
+                        borderColor: paleta.borde,
+                        borderWidth: 1,
+                      },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.lineaNumero,
+                    {
+                      color: activa ? "#ffffff" : paleta.textoBajo,
+                    },
+                  ]}
+                >
+                  {lineaItem.numero}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* 3. Lista de Motivos con Radio Buttons */}
@@ -335,6 +453,47 @@ export function ReportarDemoraScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* 7. Modal de Cámara Nativa (expo-camera) para tomar foto real */}
+      <Modal
+        visible={camaraVisible}
+        animationType="slide"
+        onRequestClose={() => setCamaraVisible(false)}
+      >
+        <View style={styles.cameraModalContainer}>
+          <CameraView
+            ref={cameraRef}
+            style={styles.cameraPreview}
+            facing="back"
+          />
+
+          <View style={styles.cameraTopBar}>
+            <TouchableOpacity
+              onPress={() => setCamaraVisible(false)}
+              style={styles.cameraCloseBtn}
+            >
+              <Ionicons name="close" size={26} color="#ffffff" />
+            </TouchableOpacity>
+            <Text style={styles.cameraTitle}>Foto de la parada / unidad</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <View style={styles.cameraBottomBar}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleCapturarFotoCamara}
+              disabled={capturandoFoto}
+              style={styles.shutterOuter}
+            >
+              {capturandoFoto ? (
+                <ActivityIndicator color="#0f172a" />
+              ) : (
+                <View style={styles.shutterInner} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -480,5 +639,58 @@ const styles = StyleSheet.create({
   botonEnviarTexto: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  cameraModalContainer: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  cameraPreview: {
+    flex: 1,
+  },
+  cameraTopBar: {
+    position: "absolute",
+    top: 48,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  cameraCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cameraTitle: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  cameraBottomBar: {
+    position: "absolute",
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shutterOuter: {
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    borderWidth: 4,
+    borderColor: "#ffffff",
+    backgroundColor: "rgba(255,255,255,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shutterInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#ffffff",
   },
 });

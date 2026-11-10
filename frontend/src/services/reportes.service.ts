@@ -1,4 +1,5 @@
 import * as Network from "expo-network";
+import { Platform } from "react-native";
 import {
   encolarReporteOffline,
   limpiarReportesSincronizados,
@@ -8,6 +9,47 @@ import {
 import type { MotivoDemora, ReporteDeDemora, RespuestaExitosa } from "../types";
 import { clienteHttp } from "./cliente";
 import { ErrorApi } from "./error.service";
+
+export interface ArchivoSubido {
+  url: string;
+  tipo: "imagen" | "audio" | "video";
+  bytes: number;
+}
+
+/**
+ * Sube una foto capturada con la cámara o seleccionada de la galería a POST /api/v1/archivos.
+ * Devuelve la URL pública asignada por el servidor para adjuntarla en fotoUri del reporte.
+ */
+export async function subirArchivoImagen(
+  uriLocal: string,
+): Promise<RespuestaExitosa<ArchivoSubido>> {
+  const formData = new FormData();
+  const extension = uriLocal.split(".").pop()?.toLowerCase() || "jpg";
+  const mime =
+    extension === "png"
+      ? "image/png"
+      : extension === "webp"
+        ? "image/webp"
+        : "image/jpeg";
+  const nombreArchivo = `reporte-${Date.now()}.${extension === "png" ? "png" : "jpg"}`;
+
+  if (Platform.OS === "web") {
+    const resp = await fetch(uriLocal);
+    const blob = await resp.blob();
+    formData.append("archivo", blob, nombreArchivo);
+  } else {
+    formData.append("archivo", {
+      uri: uriLocal,
+      name: nombreArchivo,
+      type: mime,
+    } as any);
+  }
+
+  return clienteHttp<ArchivoSubido>("/archivos", {
+    method: "POST",
+    body: formData,
+  });
+}
 
 /**
  * Determina si el error recibido corresponde a un corte o falta de conexión.
@@ -67,8 +109,34 @@ export const crearReporte = async (nuevo: {
 
   if (nuevo.id) payload.id = nuevo.id;
   if (nuevo.comentario?.trim()) payload.comentario = nuevo.comentario.trim();
-  if (nuevo.fotoUri && nuevo.fotoUri.startsWith("http")) {
-    payload.fotoUri = nuevo.fotoUri;
+
+  // Si se adjuntó una foto local (file://, content://, data:), primero la subimos a POST /archivos
+  if (nuevo.fotoUri) {
+    if (
+      nuevo.fotoUri.startsWith("file:") ||
+      nuevo.fotoUri.startsWith("content:") ||
+      nuevo.fotoUri.startsWith("data:") ||
+      nuevo.fotoUri.startsWith("blob:")
+    ) {
+      try {
+        const resArchivo = await subirArchivoImagen(nuevo.fotoUri);
+        if (resArchivo.datos?.url) {
+          payload.fotoUri = resArchivo.datos.url;
+        }
+      } catch (err) {
+        if (esErrorDeConexion(err)) {
+          // Si estamos sin internet, se encolará el reporte en el bloque catch principal
+          throw err;
+        }
+        // Si falló la subida por otro motivo, enviamos el reporte sin foto para no bloquear al pasajero
+        console.warn("No se pudo subir la foto adjunta, se enviará el reporte de texto:", err);
+      }
+    } else if (
+      nuevo.fotoUri.startsWith("http") &&
+      nuevo.fotoUri.includes("/archivos/")
+    ) {
+      payload.fotoUri = nuevo.fotoUri;
+    }
   }
 
   try {

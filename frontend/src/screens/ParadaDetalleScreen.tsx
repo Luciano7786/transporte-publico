@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+   Vibration,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -108,6 +109,8 @@ export function ParadaDetalleScreen() {
 
   const handleConfirmarDemora = async (reporteId: string) => {
     try {
+      // Vibración háptica corta al confirmar el reporte ajeno
+      Vibration.vibrate(40);
       const res = await confirmarReporte(reporteId);
       setReportes((prev) =>
         prev.map((r) => (r.id === reporteId ? res.datos : r)),
