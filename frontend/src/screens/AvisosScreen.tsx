@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useContext, useEffect, useState } from "react";
 import {
@@ -19,6 +20,7 @@ import {
   filtrarAvisos,
   formatearTiempoActualizacion,
   obtenerAvisos,
+  obtenerUltimaActualizacionAvisos,
 } from "../services/avisos.service";
 import { obtenerLineas } from "../services/lineas.service";
 import type { Aviso, Linea } from "../types";
@@ -32,6 +34,12 @@ export function AvisosScreen() {
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [filtroActual, setFiltroActual] = useState<FiltroAvisos>("vigentes");
   const [refrescando, setRefrescando] = useState(false);
+  const [ultimaActualizacionIso, setUltimaActualizacionIso] = useState<string>(
+    () => new Date().toISOString(),
+  );
+  const [minutosTranscurridos, setMinutosTranscurridos] = useState<number>(0);
+  const [mostrandoCacheOffline, setMostrandoCacheOffline] =
+    useState<boolean>(false);
 
   // Estado del modal de video
   const [videoModalVisible, setVideoModalVisible] = useState(false);
@@ -39,13 +47,33 @@ export function AvisosScreen() {
 
   const cargarDatos = async () => {
     try {
-      const [resAvisos, resLineas] = await Promise.allSettled([
-        obtenerAvisos(),
+      const [resAvisos, resLineas, fechaGuardada] = await Promise.allSettled([
+        obtenerAvisos("todos"),
         obtenerLineas(),
+        obtenerUltimaActualizacionAvisos(),
       ]);
 
       if (resAvisos.status === "fulfilled") {
         setTodosAvisos(resAvisos.value.datos);
+        const esCache = Boolean(resAvisos.value.desdeCache);
+        setMostrandoCacheOffline(esCache);
+
+        if (!esCache) {
+          setUltimaActualizacionIso(new Date().toISOString());
+          setMinutosTranscurridos(0);
+        } else if (
+          fechaGuardada.status === "fulfilled" &&
+          fechaGuardada.value
+        ) {
+          setUltimaActualizacionIso(fechaGuardada.value);
+          const diffMin = Math.max(
+            0,
+            Math.floor(
+              (Date.now() - new Date(fechaGuardada.value).getTime()) / 60000,
+            ),
+          );
+          setMinutosTranscurridos(diffMin);
+        }
       }
       if (resLineas.status === "fulfilled") {
         setLineas(resLineas.value.datos);
@@ -58,6 +86,17 @@ export function AvisosScreen() {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  // Recalcula cada 30 segundos cuántos minutos pasaron desde la última actualización real
+  useEffect(() => {
+    const calcularMinutos = () => {
+      const diffMs = Date.now() - new Date(ultimaActualizacionIso).getTime();
+      setMinutosTranscurridos(Math.max(0, Math.floor(diffMs / 60000)));
+    };
+    calcularMinutos();
+    const timer = setInterval(calcularMinutos, 30000);
+    return () => clearInterval(timer);
+  }, [ultimaActualizacionIso]);
 
   const onRefresh = async () => {
     setRefrescando(true);
@@ -94,6 +133,28 @@ export function AvisosScreen() {
         onChangeFiltro={setFiltroActual}
       />
 
+      {/* Aviso de información guardada cuando no hay señal */}
+      {mostrandoCacheOffline ? (
+        <View
+          style={[
+            styles.offlineBanner,
+            {
+              backgroundColor: paleta.superficie2,
+              borderColor: paleta.borde,
+            },
+          ]}
+        >
+          <Ionicons
+            name="cloud-offline-outline"
+            size={16}
+            color={paleta.advertencia}
+          />
+          <Text style={[styles.offlineBannerTexto, { color: paleta.textoMedio }]}>
+            Mostrando avisos guardados en el teléfono (sin conexión)
+          </Text>
+        </View>
+      ) : null}
+
       {/* 3. Listado de Avisos */}
       <ScrollView
         style={styles.scroll}
@@ -129,9 +190,12 @@ export function AvisosScreen() {
           ))
         )}
 
-        {/* 4. Pie de estado de actualización */}
+        {/* 4. Pie de estado de actualización con antigüedad real */}
         <Text style={[styles.actualizadoTexto, { color: paleta.textoBajo }]}>
-          {formatearTiempoActualizacion(3)}
+          {formatearTiempoActualizacion(
+            minutosTranscurridos,
+            mostrandoCacheOffline,
+          )}
         </Text>
       </ScrollView>
 
@@ -163,6 +227,22 @@ const styles = StyleSheet.create({
   emptyTexto: {
     fontSize: 15,
     textAlign: "center",
+  },
+  offlineBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  offlineBannerTexto: {
+    fontSize: 12,
+    fontWeight: "600",
+    flex: 1,
   },
   actualizadoTexto: {
     textAlign: "center",

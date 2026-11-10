@@ -1,11 +1,16 @@
+import Storage from "expo-sqlite/kv-store";
 import {
   guardarLineasEnCache,
   obtenerLineaPorIdDeCache,
   obtenerLineasDeCache,
 } from "../db/database";
+import { AVISOS_MOCK } from "../mocks/lineas.mock";
 import type { Aviso, Linea, RespuestaExitosa } from "../types";
 import { clienteHttp } from "./cliente";
 import { ErrorApi } from "./error.service";
+
+const CLAVE_CACHE_AVISOS = "cache.avisos.lista";
+const CLAVE_CACHE_AVISOS_FECHA = "cache.avisos.fecha_iso";
 
 /**
  * Determina si el error recibido corresponde a un corte o falta de conexión.
@@ -72,17 +77,70 @@ export const obtenerLineaPorId = async (
 
 /**
  * Obtiene la lista de avisos del sistema (vigentes por defecto).
+ * Estrategia de Resiliencia: guarda los avisos y la fecha de actualización en caché local;
+ * si no hay señal, devuelve los avisos cacheados (o los datos semilla) e informa desdeCache = true.
  */
-export const obtenerAvisos = (
+export const obtenerAvisos = async (
   estado: "vigentes" | "proximos" | "todos" = "vigentes",
   lineaId?: string,
-): Promise<RespuestaExitosa<Aviso[]>> => {
+): Promise<RespuestaExitosa<Aviso[]> & { desdeCache?: boolean }> => {
   const params = new URLSearchParams();
   params.set("estado", estado);
   if (lineaId) params.set("lineaId", lineaId);
 
-  return clienteHttp<Aviso[]>(`/avisos?${params.toString()}`);
+  try {
+    const res = await clienteHttp<Aviso[]>(`/avisos?${params.toString()}`);
+    if (res.datos && res.datos.length > 0 && !lineaId) {
+      const ahoraIso = new Date().toISOString();
+      Promise.all([
+        Storage.setItem(CLAVE_CACHE_AVISOS, JSON.stringify(res.datos)),
+        Storage.setItem(CLAVE_CACHE_AVISOS_FECHA, ahoraIso),
+      ]).catch(() => {});
+    }
+    return { ...res, desdeCache: false };
+  } catch (error) {
+    if (esErrorDeConexion(error)) {
+      let listaAvisos: Aviso[] = AVISOS_MOCK;
+      try {
+        const guardado = await Storage.getItem(CLAVE_CACHE_AVISOS);
+        if (guardado) {
+          const parsed = JSON.parse(guardado);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            listaAvisos = parsed as Aviso[];
+          }
+        }
+      } catch {
+        // Mantiene AVISOS_MOCK como respaldo
+      }
+
+      if (lineaId) {
+        listaAvisos = listaAvisos.filter((a) => a.lineaIds.includes(lineaId));
+      }
+
+      return {
+        datos: listaAvisos,
+        meta: {
+          total: listaAvisos.length,
+          pagina: 1,
+          porPagina: listaAvisos.length,
+        },
+        desdeCache: true,
+      };
+    }
+    throw error;
+  }
 };
+
+/**
+ * Obtiene la fecha ISO de la última actualización exitosa de avisos.
+ */
+export async function obtenerUltimaActualizacionAvisos(): Promise<string | null> {
+  try {
+    return await Storage.getItem(CLAVE_CACHE_AVISOS_FECHA);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Retorna el aviso vigente (desvío o alerta) para una línea dada.

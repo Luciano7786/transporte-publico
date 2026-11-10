@@ -10,6 +10,18 @@ const NOMBRE_BASE_DATOS = "transporte_parana.db";
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 let inicializacionPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+let colaEscrituraPromise: Promise<void> = Promise.resolve();
+
+/**
+ * Encola operaciones de escritura en SQLite de forma secuencial para evitar
+ * colisiones de transacciones concurrentes ("cannot start a transaction within a transaction")
+ * cuando múltiples pantallas actualizan el caché al mismo tiempo.
+ */
+function ejecutarEscrituraSecuencial(tarea: () => Promise<void>): Promise<void> {
+  const siguiente = colaEscrituraPromise.then(tarea, tarea);
+  colaEscrituraPromise = siguiente.catch(() => {});
+  return siguiente;
+}
 
 export interface ReporteOfflineLocal {
   id: string;
@@ -179,7 +191,7 @@ export async function guardarLineasEnCache(lineas: Linea[]): Promise<void> {
   const db = await obtenerBaseDeDatos();
   if (!db || lineas.length === 0) return;
 
-  await db.withTransactionAsync(async () => {
+  await ejecutarEscrituraSecuencial(async () => {
     for (const linea of lineas) {
       await db.runAsync(
         `INSERT OR REPLACE INTO cache_lineas (id, numero, nombre, color, empresa, activa, json_completo)
@@ -252,7 +264,7 @@ export async function guardarParadasEnCache(paradas: Parada[]): Promise<void> {
   const db = await obtenerBaseDeDatos();
   if (!db || paradas.length === 0) return;
 
-  await db.withTransactionAsync(async () => {
+  await ejecutarEscrituraSecuencial(async () => {
     for (const parada of paradas) {
       await db.runAsync(
         `INSERT OR REPLACE INTO cache_paradas (id, nombre, latitud, longitud, sentido, refugio, json_completo)
@@ -345,11 +357,13 @@ export async function guardarHorariosEnCache(
   const db = await obtenerBaseDeDatos();
   if (!db) return;
 
-  await db.runAsync(
-    `INSERT OR REPLACE INTO cache_horarios (paradaId, lineaId, sentido, json_completo)
-     VALUES (?, ?, ?, ?);`,
-    [paradaId, lineaId, sentido, JSON.stringify(horarios)],
-  );
+  await ejecutarEscrituraSecuencial(async () => {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO cache_horarios (paradaId, lineaId, sentido, json_completo)
+       VALUES (?, ?, ?, ?);`,
+      [paradaId, lineaId, sentido, JSON.stringify(horarios)],
+    );
+  });
 }
 
 /**
