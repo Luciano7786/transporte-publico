@@ -1,46 +1,66 @@
 import { Injectable } from '@nestjs/common';
-import { ErrorDeApi } from '../common/errors/error-api.js';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { ExclusionPorClave } from '../common/db/exclusion.js';
+import { esViolacionDeUnicidad } from '../common/db/uniqueness.js';
 import { AlmacenTokensPush, type Plataforma } from '../common/notifications/ports.js';
+import { DispositivoPushEntidad } from './device-token.entity.js';
 
 /**
  * PARTE 1 DE LOS ALUMNOS: guardar los tokens de Expo de cada usuario.
- *
- * Hoy cada método responde 501 NO_IMPLEMENTADO. Reemplacen el cuerpo de cada uno y corran
- * `pnpm test:notificaciones` hasta que dé verde. Las pistas están en docs/NOTIFICATIONS.md.
  */
 @Injectable()
 export class AlmacenTokensPorHacer extends AlmacenTokensPush {
-  /**
-   * TODO(alumnos): dejar guardado que este teléfono (`tokenExpo`) es de este usuario.
-   * - Registrar el mismo token dos veces no tiene que duplicar nada ni dar error.
-   * - Si el token ya era de otro usuario (alguien cerró sesión y entró otra persona en el mismo
-   *   teléfono), pasa a ser del usuario actual.
-   * - Dos pedidos simultáneos con el mismo token tienen que dejar un solo registro: acordate de
-   *   AGENTS.md §5.5 (la base garantiza la unicidad, no sólo un `if`).
-   */
-  guardar(_usuarioId: string, _tokenExpo: string, _plataforma: Plataforma): Promise<void> {
-    return Promise.reject(new ErrorDeApi('NO_IMPLEMENTADO'));
+  private readonly cerrojo = new ExclusionPorClave();
+
+  constructor(
+    @InjectRepository(DispositivoPushEntidad)
+    private readonly repositorio: Repository<DispositivoPushEntidad>,
+  ) {
+    super();
   }
 
-  /**
-   * TODO(alumnos): borrar ese token. Si no existe, no es un error.
-   */
-  borrar(_tokenExpo: string): Promise<void> {
-    return Promise.reject(new ErrorDeApi('NO_IMPLEMENTADO'));
+  async guardar(usuarioId: string, tokenExpo: string, plataforma: Plataforma): Promise<void> {
+    await this.cerrojo.ejecutar(tokenExpo, async () => {
+      const existente = await this.repositorio.findOneBy({ tokenExpo });
+      if (existente) {
+        if (existente.usuarioId !== usuarioId || existente.plataforma !== plataforma) {
+          await this.repositorio.update({ tokenExpo }, { usuarioId, plataforma });
+        }
+        return;
+      }
+
+      try {
+        await this.repositorio.insert({
+          tokenExpo,
+          usuarioId,
+          plataforma,
+        });
+      } catch (error) {
+        if (!esViolacionDeUnicidad(error)) throw error;
+        await this.repositorio.update({ tokenExpo }, { usuarioId, plataforma });
+      }
+    });
   }
 
-  /**
-   * TODO(alumnos): devolver los tokens de todos los teléfonos de esos usuarios.
-   * Con una lista vacía, devuelve una lista vacía.
-   */
-  tokensDe(_usuarioIds: string[]): Promise<string[]> {
-    return Promise.reject(new ErrorDeApi('NO_IMPLEMENTADO'));
+  async borrar(tokenExpo: string): Promise<void> {
+    await this.repositorio.delete({ tokenExpo });
   }
 
-  /**
-   * TODO(alumnos): borrar estos tokens (Expo dijo que ya no sirven). Los demás quedan.
-   */
-  descartar(_tokens: string[]): Promise<void> {
-    return Promise.reject(new ErrorDeApi('NO_IMPLEMENTADO'));
+  async tokensDe(usuarioIds: string[]): Promise<string[]> {
+    if (usuarioIds.length === 0) return [];
+    const unicos = [...new Set(usuarioIds)];
+    const filas = await this.repositorio.find({
+      where: { usuarioId: In(unicos) },
+    });
+    // Afinamos coincidencia exacta de mayúsculas/minúsculas de usuarioId
+    return filas
+      .filter((f) => unicos.includes(f.usuarioId))
+      .map((f) => f.tokenExpo);
+  }
+
+  async descartar(tokens: string[]): Promise<void> {
+    if (tokens.length === 0) return;
+    await this.repositorio.delete({ tokenExpo: In([...new Set(tokens)]) });
   }
 }

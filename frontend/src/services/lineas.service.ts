@@ -13,12 +13,15 @@ const CLAVE_CACHE_AVISOS = "cache.avisos.lista";
 const CLAVE_CACHE_AVISOS_FECHA = "cache.avisos.fecha_iso";
 
 /**
- * Determina si el error recibido corresponde a un corte o falta de conexión.
+ * Determina si debemos usar el caché local de respaldo ante un fallo de red o del túnel.
  */
-function esErrorDeConexion(error: unknown): boolean {
+function esErrorResiliente(error: unknown): boolean {
+  if (!(error instanceof ErrorApi)) return false;
   return (
-    error instanceof ErrorApi &&
-    (error.codigo === "SIN_CONEXION" || error.codigo === "TIEMPO_AGOTADO")
+    error.codigo === "SIN_CONEXION" ||
+    error.codigo === "TIEMPO_AGOTADO" ||
+    error.codigo === "ERROR_SERVIDOR" ||
+    error.codigo === "ERROR_RESPUESTA"
   );
 }
 
@@ -37,7 +40,7 @@ export const obtenerLineas = async (): Promise<RespuestaExitosa<Linea[]>> => {
     }
     return res;
   } catch (error) {
-    if (esErrorDeConexion(error)) {
+    if (esErrorResiliente(error)) {
       const lineasCache = await obtenerLineasDeCache();
       if (lineasCache.length > 0) {
         return {
@@ -65,7 +68,7 @@ export const obtenerLineaPorId = async (
     const res = await clienteHttp<Linea>(`/lineas/${encodeURIComponent(id)}`);
     return res;
   } catch (error) {
-    if (esErrorDeConexion(error)) {
+    if (esErrorResiliente(error)) {
       const lineaCache = await obtenerLineaPorIdDeCache(id);
       if (lineaCache) {
         return { datos: lineaCache, meta: null };
@@ -99,7 +102,7 @@ export const obtenerAvisos = async (
     }
     return { ...res, desdeCache: false };
   } catch (error) {
-    if (esErrorDeConexion(error)) {
+    if (esErrorResiliente(error)) {
       let listaAvisos: Aviso[] = AVISOS_MOCK;
       try {
         const guardado = await Storage.getItem(CLAVE_CACHE_AVISOS);

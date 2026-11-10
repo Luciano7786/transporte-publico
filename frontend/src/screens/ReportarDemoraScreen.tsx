@@ -1,6 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,14 +15,16 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Vibration,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useThemeContext } from "../hooks/use-theme-context";
 import { obtenerLineas } from "../services/lineas.service";
 import { obtenerParadaPorId } from "../services/paradas.service";
-import { crearReporte } from "../services/reportes.service";
+import {
+  crearReporte,
+  guardarFotoReporteEnDispositivo,
+} from "../services/reportes.service";
 import type { Linea, MotivoDemora, Parada } from "../types";
 
 export function ReportarDemoraScreen() {
@@ -134,8 +138,9 @@ export function ReportarDemoraScreen() {
         quality: 0.7,
       });
       if (foto?.uri) {
-        setFotoUri(foto.uri);
-        Vibration.vibrate(30);
+        const uriGuardada = guardarFotoReporteEnDispositivo(foto.uri);
+        setFotoUri(uriGuardada);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       }
       setCamaraVisible(false);
     } catch {
@@ -148,45 +153,36 @@ export function ReportarDemoraScreen() {
     }
   };
 
-  const handleGaleria = () => {
-    if (Platform.OS === "web") {
-      const input = (globalThis as any).document?.createElement("input");
-      if (input) {
-        input.type = "file";
-        input.accept = "image/*";
-        input.onchange = (e: any) => {
-          const file = e.target?.files?.[0];
-          if (file) {
-            const url = URL.createObjectURL(file);
-            setFotoUri(url);
-          }
-        };
-        input.click();
+  const handleGaleria = async () => {
+    try {
+      const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permiso.granted) {
+        Alert.alert(
+          "Permiso requerido",
+          "Necesitamos acceso a tu galería para seleccionar una foto de la parada o unidad.",
+        );
         return;
       }
-    }
 
-    Alert.alert(
-      "Adjuntar imagen",
-      "Elegí una imagen de referencia o abrí la cámara para tomar una foto actual de la parada:",
-      [
-        {
-          text: "Abrir cámara",
-          onPress: handleSacarFoto,
-        },
-        {
-          text: "Imagen de parada llena",
-          onPress: () =>
-            setFotoUri(
-              "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=400",
-            ),
-        },
-        {
-          text: "Cancelar",
-          style: "cancel",
-        },
-      ],
-    );
+      const resultado = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.75,
+      });
+
+      if (!resultado.canceled && resultado.assets && resultado.assets[0]?.uri) {
+        const uriGuardada = guardarFotoReporteEnDispositivo(
+          resultado.assets[0].uri,
+        );
+        setFotoUri(uriGuardada);
+        Haptics.selectionAsync().catch(() => {});
+      }
+    } catch {
+      Alert.alert(
+        "Galería",
+        "No se pudo abrir la galería de imágenes en este dispositivo.",
+      );
+    }
   };
 
   const handleEnviarReporte = async () => {
@@ -200,7 +196,9 @@ export function ReportarDemoraScreen() {
         fotoUri,
       });
 
-      Vibration.vibrate(40);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => {},
+      );
       const esOffline = res.datos && !res.datos.sincronizado;
 
       Alert.alert(

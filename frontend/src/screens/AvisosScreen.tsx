@@ -2,10 +2,12 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useContext, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -23,6 +25,7 @@ import {
   obtenerUltimaActualizacionAvisos,
 } from "../services/avisos.service";
 import { obtenerLineas } from "../services/lineas.service";
+import { notificarNuevosAvisosEnLineasFavoritas } from "../services/notificaciones.service";
 import type { Aviso, Linea } from "../types";
 
 export function AvisosScreen() {
@@ -33,6 +36,8 @@ export function AvisosScreen() {
   const [todosAvisos, setTodosAvisos] = useState<Aviso[]>([]);
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [filtroActual, setFiltroActual] = useState<FiltroAvisos>("vigentes");
+  const [cargando, setCargando] = useState(true);
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [refrescando, setRefrescando] = useState(false);
   const [ultimaActualizacionIso, setUltimaActualizacionIso] = useState<string>(
     () => new Date().toISOString(),
@@ -45,8 +50,11 @@ export function AvisosScreen() {
   const [videoModalVisible, setVideoModalVisible] = useState(false);
   const [videoUrlActual, setVideoUrlActual] = useState<string | null>(null);
 
-  const cargarDatos = async () => {
+  const cargarDatos = async (esRefresco = false) => {
     try {
+      if (!esRefresco) setCargando(true);
+      setErrorCarga(null);
+
       const [resAvisos, resLineas, fechaGuardada] = await Promise.allSettled([
         obtenerAvisos("todos"),
         obtenerLineas(),
@@ -57,6 +65,12 @@ export function AvisosScreen() {
         setTodosAvisos(resAvisos.value.datos);
         const esCache = Boolean(resAvisos.value.desdeCache);
         setMostrandoCacheOffline(esCache);
+
+        notificarNuevosAvisosEnLineasFavoritas(
+          resAvisos.value.datos,
+          auth?.lineasFavoritas ?? ["lin-05", "lin-14"],
+          auth?.usuario?.avisosActivos ?? true,
+        ).catch(() => {});
 
         if (!esCache) {
           setUltimaActualizacionIso(new Date().toISOString());
@@ -74,17 +88,24 @@ export function AvisosScreen() {
           );
           setMinutosTranscurridos(diffMin);
         }
+      } else {
+        setErrorCarga(
+          resAvisos.reason?.message ||
+            "No se pudieron obtener los avisos en este momento.",
+        );
       }
       if (resLineas.status === "fulfilled") {
         setLineas(resLineas.value.datos);
       }
-    } catch (err) {
-      console.warn("Error cargando avisos:", err);
+    } catch (err: any) {
+      setErrorCarga(err?.message || "No se pudieron cargar los avisos.");
+    } finally {
+      setCargando(false);
     }
   };
 
   useEffect(() => {
-    cargarDatos();
+    cargarDatos(false);
   }, []);
 
   // Recalcula cada 30 segundos cuántos minutos pasaron desde la última actualización real
@@ -100,7 +121,7 @@ export function AvisosScreen() {
 
   const onRefresh = async () => {
     setRefrescando(true);
-    await cargarDatos();
+    await cargarDatos(true);
     setRefrescando(false);
   };
 
@@ -168,7 +189,42 @@ export function AvisosScreen() {
           />
         }
       >
-        {avisosFiltrados.length === 0 ? (
+        {cargando && todosAvisos.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <ActivityIndicator size="large" color={paleta.acento} />
+            <Text style={[styles.emptyTexto, { color: paleta.textoMedio, marginTop: 10 }]}>
+              Consultando avisos de la Dirección de Transporte...
+            </Text>
+          </View>
+        ) : errorCarga && todosAvisos.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons
+              name="alert-circle-outline"
+              size={36}
+              color={paleta.advertencia}
+            />
+            <Text style={[styles.emptyTexto, { color: paleta.textoMedio, marginTop: 8 }]}>
+              {errorCarga}
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => cargarDatos(false)}
+              style={[
+                styles.botonReintentar,
+                { backgroundColor: paleta.acento },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.botonReintentarTexto,
+                  { color: paleta.textoSobreAcento },
+                ]}
+              >
+                Reintentar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : avisosFiltrados.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyTexto, { color: paleta.textoMedio }]}>
               {filtroActual === "vencidos"
@@ -227,6 +283,16 @@ const styles = StyleSheet.create({
   emptyTexto: {
     fontSize: 15,
     textAlign: "center",
+  },
+  botonReintentar: {
+    marginTop: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  botonReintentarTexto: {
+    fontSize: 14,
+    fontWeight: "700",
   },
   offlineBanner: {
     flexDirection: "row",

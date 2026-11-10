@@ -23,12 +23,15 @@ export interface FiltrosParadas {
 }
 
 /**
- * Determina si el error recibido corresponde a un corte o falta de conexión.
+ * Determina si el error recibido corresponde a un corte de conexión o a un túnel/servidor caído.
  */
 function esErrorDeConexion(error: unknown): boolean {
+  if (!(error instanceof ErrorApi)) return false;
   return (
-    error instanceof ErrorApi &&
-    (error.codigo === "SIN_CONEXION" || error.codigo === "TIEMPO_AGOTADO")
+    error.codigo === "SIN_CONEXION" ||
+    error.codigo === "TIEMPO_AGOTADO" ||
+    error.codigo === "ERROR_SERVIDOR" ||
+    error.codigo === "ERROR_RESPUESTA"
   );
 }
 

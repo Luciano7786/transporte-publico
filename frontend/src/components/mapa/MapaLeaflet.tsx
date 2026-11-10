@@ -1,6 +1,10 @@
 import React, { useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
+import MapView, { Marker, Polyline } from "react-native-maps";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
+
+// Expone los componentes de react-native-maps para que estén disponibles cuando se requiera renderizado nativo
+export const ComponentesMapaNativo = { MapView, Marker, Polyline };
 
 export interface PuntoMapa {
   id: string;

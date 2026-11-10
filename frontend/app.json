@@ -1,34 +1,73 @@
 {
   "expo": {
-    "name": "transporte-publico",
+    "name": "Paraná en Colectivo",
     "slug": "transporte-publico",
     "version": "1.0.0",
     "scheme": "transporte-publico",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D254C"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "ar.gob.parana.transportepublico"
     },
     "android": {
+      "package": "ar.gob.parana.transportepublico",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0D254C"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "VIBRATE"
+      ]
     },
     "plugins": [
       "expo-sqlite",
       "expo-secure-store",
+      "expo-video",
       [
         "expo-camera",
         {
-          "cameraPermission": "Permite acceder a la cámara para escanear el código QR de las paradas."
+          "cameraPermission": "Permite acceder a la cámara para escanear el código QR de las paradas y adjuntar fotos de desvíos o demoras."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite elegir una foto de tu galería para adjuntar a un reporte de demora."
         }
       ],
       [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Permite acceder a tu ubicación para mostrarte las paradas más cercanas y calcular las distancias reales."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Permite desbloquear tu sesión rápidamente con huella digital o reconocimiento facial."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0D254C"
         }
       ]
     ]

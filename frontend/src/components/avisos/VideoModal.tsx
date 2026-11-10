@@ -1,5 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import React, { useMemo } from "react";
+import { Directory, File, Paths } from "expo-file-system";
+import { useVideoPlayer, VideoView } from "expo-video";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Modal,
   Platform,
@@ -40,14 +42,84 @@ function resolverUrlVideo(videoUrl: string | null): string {
   return videoUrl;
 }
 
+/**
+ * Descarga y cachea el archivo MP4 del desvío en el directorio de caché local del dispositivo
+ * utilizando expo-file-system, para que pueda reproducirse incluso sin señal.
+ */
+async function obtenerOCachearVideoLocal(urlRemota: string): Promise<string> {
+  if (Platform.OS === "web") return urlRemota;
+
+  try {
+    const dirCache = new Directory(Paths.cache, "videos-avisos");
+    if (!dirCache.exists) {
+      dirCache.create({ intermediates: true, idempotent: true });
+    }
+
+    const nombreSeguro =
+      urlRemota.split("/").pop()?.replace(/[^a-zA-Z0-9._-]/g, "_") ||
+      "desvio.mp4";
+    const archivoDestino = new File(dirCache, nombreSeguro);
+
+    if (archivoDestino.exists && archivoDestino.size > 0) {
+      return archivoDestino.uri;
+    }
+
+    const descargado = await File.downloadFileAsync(urlRemota, archivoDestino, {
+      idempotent: true,
+    });
+    return descargado.uri;
+  } catch {
+    return urlRemota;
+  }
+}
+
 export const VideoModal: React.FC<VideoModalProps> = ({
   visible,
   videoUrl,
   onClose,
 }) => {
   const { paleta } = useThemeContext();
-
   const urlResuelta = useMemo(() => resolverUrlVideo(videoUrl), [videoUrl]);
+
+  const [fuenteVideo, setFuenteVideo] = useState<string>(urlResuelta);
+  const [usarFallbackAnimado, setUsarFallbackAnimado] = useState<boolean>(false);
+
+  useEffect(() => {
+    let cancelado = false;
+    setUsarFallbackAnimado(false);
+    setFuenteVideo(urlResuelta);
+
+    if (visible) {
+      obtenerOCachearVideoLocal(urlResuelta).then((uriLocal) => {
+        if (!cancelado) {
+          setFuenteVideo(uriLocal);
+        }
+      });
+    }
+
+    return () => {
+      cancelado = true;
+    };
+  }, [visible, urlResuelta]);
+
+  // Reproductor nativo de expo-video
+  const player = useVideoPlayer(fuenteVideo, (instancia) => {
+    instancia.loop = true;
+    if (visible) {
+      instancia.play();
+    }
+  });
+
+  useEffect(() => {
+    const sub = player.addListener("statusChange", (payload) => {
+      if (payload.status === "error") {
+        setUsarFallbackAnimado(true);
+      }
+    });
+    return () => {
+      sub.remove();
+    };
+  }, [player]);
 
   const htmlReproductor = useMemo(() => {
     const safeUrl = JSON.stringify(urlResuelta);
@@ -213,13 +285,21 @@ export const VideoModal: React.FC<VideoModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Área de Reproducción de Video Real (HTML5 Video en WebView / Web) */}
+          {/* Área de Reproducción de Video (expo-video nativo con caché en expo-file-system y fallback animado) */}
           <View style={[styles.playerArea, { backgroundColor: "#000000" }]}>
-            {Platform.OS === "web" ? (
+            {!usarFallbackAnimado && Platform.OS !== "web" ? (
+              <VideoView
+                player={player}
+                style={styles.webviewVideo}
+                contentFit="contain"
+                nativeControls
+              />
+            ) : Platform.OS === "web" && !usarFallbackAnimado ? (
               <video
-                src={urlResuelta}
+                src={fuenteVideo}
                 controls
                 autoPlay
+                onError={() => setUsarFallbackAnimado(true)}
                 style={{ width: "100%", height: "100%" } as any}
               />
             ) : (

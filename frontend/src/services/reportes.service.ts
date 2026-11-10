@@ -1,3 +1,4 @@
+import { Directory, File, Paths } from "expo-file-system";
 import * as Network from "expo-network";
 import { Platform } from "react-native";
 import {
@@ -17,14 +18,59 @@ export interface ArchivoSubido {
 }
 
 /**
+ * Guarda de forma persistente en el dispositivo una foto capturada con expo-camera
+ * o seleccionada con expo-image-picker, utilizando la API nueva de expo-file-system
+ * (File, Directory, Paths). Devuelve la URI local dentro de Paths.document.
+ */
+export function guardarFotoReporteEnDispositivo(uriOrigen: string): string {
+  if (Platform.OS === "web" || !uriOrigen) return uriOrigen;
+
+  try {
+    const dirFotos = new Directory(Paths.document, "reportes-fotos");
+    if (!dirFotos.exists) {
+      dirFotos.create({ intermediates: true, idempotent: true });
+    }
+
+    const archivoOrigen = new File(uriOrigen);
+    if (!archivoOrigen.exists) {
+      return uriOrigen;
+    }
+
+    // Si ya está dentro de nuestro directorio persistente, lo devolvemos tal cual
+    if (uriOrigen.includes("reportes-fotos")) {
+      return archivoOrigen.uri;
+    }
+
+    const ext =
+      uriOrigen
+        .split(".")
+        .pop()
+        ?.toLowerCase()
+        .replace(/[^a-z0-9]/g, "") || "jpg";
+    const extensionSegura = ext === "png" || ext === "webp" ? ext : "jpg";
+    const archivoDestino = new File(
+      dirFotos,
+      `evidencia-${Date.now()}.${extensionSegura}`,
+    );
+
+    archivoOrigen.copy(archivoDestino);
+    return archivoDestino.uri;
+  } catch {
+    return uriOrigen;
+  }
+}
+
+/**
  * Sube una foto capturada con la cámara o seleccionada de la galería a POST /api/v1/archivos.
+ * Lee y valida el archivo en el dispositivo con la API nueva de expo-file-system (File).
  * Devuelve la URL pública asignada por el servidor para adjuntarla en fotoUri del reporte.
  */
 export async function subirArchivoImagen(
   uriLocal: string,
 ): Promise<RespuestaExitosa<ArchivoSubido>> {
+  const uriPersistida = guardarFotoReporteEnDispositivo(uriLocal);
   const formData = new FormData();
-  const extension = uriLocal.split(".").pop()?.toLowerCase() || "jpg";
+  const extension = uriPersistida.split(".").pop()?.toLowerCase() || "jpg";
   const mime =
     extension === "png"
       ? "image/png"
@@ -34,12 +80,14 @@ export async function subirArchivoImagen(
   const nombreArchivo = `reporte-${Date.now()}.${extension === "png" ? "png" : "jpg"}`;
 
   if (Platform.OS === "web") {
-    const resp = await fetch(uriLocal);
+    const resp = await fetch(uriPersistida);
     const blob = await resp.blob();
     formData.append("archivo", blob, nombreArchivo);
   } else {
+    const archivoLocal = new File(uriPersistida);
+    const uriParaSubir = archivoLocal.exists ? archivoLocal.uri : uriPersistida;
     formData.append("archivo", {
-      uri: uriLocal,
+      uri: uriParaSubir,
       name: nombreArchivo,
       type: mime,
     } as any);
@@ -52,12 +100,15 @@ export async function subirArchivoImagen(
 }
 
 /**
- * Determina si el error recibido corresponde a un corte o falta de conexión.
+ * Determina si el error recibido corresponde a un corte de conexión o a un túnel/servidor caído.
  */
 function esErrorDeConexion(error: unknown): boolean {
+  if (!(error instanceof ErrorApi)) return false;
   return (
-    error instanceof ErrorApi &&
-    (error.codigo === "SIN_CONEXION" || error.codigo === "TIEMPO_AGOTADO")
+    error.codigo === "SIN_CONEXION" ||
+    error.codigo === "TIEMPO_AGOTADO" ||
+    error.codigo === "ERROR_SERVIDOR" ||
+    error.codigo === "ERROR_RESPUESTA"
   );
 }
 
@@ -147,13 +198,14 @@ export const crearReporte = async (nuevo: {
     return res;
   } catch (error) {
     if (esErrorDeConexion(error)) {
-      // Guardar en cola local offline
+      // Guardar en cola local offline (incluyendo la URI local de la foto en el dispositivo)
       await encolarReporteOffline({
         id: reporteId,
         lineaId: nuevo.lineaId,
         paradaId: nuevo.paradaId,
         motivo: nuevo.motivo,
         comentario: nuevo.comentario ?? null,
+        fotoUri: nuevo.fotoUri ?? null,
         fechaHora,
       });
 
@@ -192,6 +244,18 @@ export async function sincronizarReportesOffline(): Promise<{
 
   for (const rep of pendientes) {
     try {
+      let fotoUrlRemota: string | undefined;
+      if (rep.fotoUri) {
+        try {
+          const resArchivo = await subirArchivoImagen(rep.fotoUri);
+          if (resArchivo.datos?.url) {
+            fotoUrlRemota = resArchivo.datos.url;
+          }
+        } catch {
+          // Si la foto local ya no existe, enviamos igual el reporte
+        }
+      }
+
       await clienteHttp<ReporteDeDemora>("/reportes-demora", {
         method: "POST",
         body: JSON.stringify({
@@ -199,6 +263,7 @@ export async function sincronizarReportesOffline(): Promise<{
           paradaId: rep.paradaId,
           motivo: rep.motivo,
           comentario: rep.comentario,
+          ...(fotoUrlRemota ? { fotoUri: fotoUrlRemota } : {}),
           fechaHora: rep.fechaHora,
         }),
       });

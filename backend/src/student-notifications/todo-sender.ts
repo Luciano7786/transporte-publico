@@ -1,25 +1,82 @@
-import { Injectable } from '@nestjs/common';
-import { ErrorDeApi } from '../common/errors/error-api.js';
+import { Inject, Injectable } from '@nestjs/common';
+import { CONFIGURACION, type Configuracion } from '../config/environment.js';
 import { EnviadorPush, type MensajePush } from '../common/notifications/ports.js';
+
+interface ItemExpoPush {
+  to: string;
+  title: string;
+  body: string;
+  data: Record<string, string>;
+}
+
+interface TicketExpo {
+  status?: string;
+  details?: {
+    error?: string;
+  };
+}
+
+const LIMITE_POR_TANDA = 100;
 
 /**
  * PARTE 2 DE LOS ALUMNOS: mandar las push a Expo.
- *
- * Hoy responde 501 NO_IMPLEMENTADO. Reemplacen el cuerpo y corran `pnpm test:notificaciones`
- * hasta que dé verde. Las pistas están en docs/NOTIFICATIONS.md.
  */
 @Injectable()
 export class EnviadorPorHacer extends EnviadorPush {
-  /**
-   * TODO(alumnos): mandar los mensajes a la API de push de Expo y devolver qué tokens no sirven.
-   * - La dirección está en la variable de entorno EXPO_PUSH_URL (configuración: `expoPushUrl`).
-   * - Cada `MensajePush` trae varios tokens; a Expo se le manda un mensaje por teléfono.
-   * - Expo acepta hasta 100 mensajes por pedido: hay que mandar en tandas.
-   * - Expo responde un "ticket" por mensaje, en el mismo orden. Los que dicen
-   *   `DeviceNotRegistered` van en `tokensInvalidos`.
-   * - Si Expo no responde bien, falla con un error: quien llama (`Avisos`) lo registra y sigue.
-   */
-  enviar(_mensajes: MensajePush[]): Promise<{ tokensInvalidos: string[] }> {
-    return Promise.reject(new ErrorDeApi('NO_IMPLEMENTADO'));
+  constructor(@Inject(CONFIGURACION) private readonly config: Configuracion) {
+    super();
+  }
+
+  async enviar(mensajes: MensajePush[]): Promise<{ tokensInvalidos: string[] }> {
+    const items: ItemExpoPush[] = [];
+    for (const msg of mensajes) {
+      for (const token of msg.tokens) {
+        items.push({
+          to: token,
+          title: msg.titulo,
+          body: msg.cuerpo,
+          data: msg.datos,
+        });
+      }
+    }
+
+    if (items.length === 0) {
+      return { tokensInvalidos: [] };
+    }
+
+    const tokensInvalidos: string[] = [];
+
+    for (let i = 0; i < items.length; i += LIMITE_POR_TANDA) {
+      const tanda = items.slice(i, i + LIMITE_POR_TANDA);
+      const respuesta = await fetch(this.config.expoPushUrl, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(tanda),
+      });
+
+      if (!respuesta.ok) {
+        throw new Error(`Expo respondió con estado HTTP ${respuesta.status}`);
+      }
+
+      const cuerpo = (await respuesta.json()) as { data?: TicketExpo[] };
+      if (!cuerpo || !Array.isArray(cuerpo.data)) {
+        throw new Error('Respuesta de Expo con formato inválido');
+      }
+
+      cuerpo.data.forEach((ticket, idx) => {
+        if (
+          ticket?.status === 'error' &&
+          ticket.details?.error === 'DeviceNotRegistered' &&
+          tanda[idx]
+        ) {
+          tokensInvalidos.push(tanda[idx].to);
+        }
+      });
+    }
+
+    return { tokensInvalidos };
   }
 }

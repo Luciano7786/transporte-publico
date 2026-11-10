@@ -21,6 +21,7 @@ import {
   obtenerPerfilServicio,
   registrarseServicio,
 } from "../services/auth.service";
+import { registrarDispositivoPushEnServidor } from "../services/notificaciones.service";
 
 const CLAVE_TOKEN = "sesion.token";
 const CLAVE_USUARIO = "sesion.usuario";
@@ -181,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await SecureStore.setItem(CLAVE_TOKEN, datos.token);
       await Storage.setItem(CLAVE_USUARIO, JSON.stringify(datos.usuario));
       setUsuario(datos.usuario);
+      registrarDispositivoPushEnServidor().catch(() => {});
     },
     [],
   );
@@ -205,6 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await SecureStore.setItem(CLAVE_TOKEN, datos.token);
       await Storage.setItem(CLAVE_USUARIO, JSON.stringify(datos.usuario));
       setUsuario(datos.usuario);
+      registrarDispositivoPushEnServidor().catch(() => {});
     },
     [],
   );

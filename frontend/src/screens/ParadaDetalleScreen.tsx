@@ -1,4 +1,5 @@
 import { useNavigation, useRoute } from "@react-navigation/native";
+import * as Haptics from "expo-haptics";
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -6,7 +7,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-   Vibration,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -21,6 +21,10 @@ import {
   useUbicacion,
 } from "../hooks/use-ubicacion";
 import { obtenerLineas } from "../services/lineas.service";
+import {
+  cancelarRecordatorioColectivo,
+  programarRecordatorioColectivo,
+} from "../services/notificaciones.service";
 import {
   calcularProximosHorarios,
   obtenerHorariosPorParada,
@@ -74,6 +78,7 @@ export function ParadaDetalleScreen() {
   );
   const [recordatoriosActivos, setRecordatoriosActivos] = useState<Record<string, boolean>>({});
   const timersRecordatorioRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const notificacionesIdsRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     let activo = true;
@@ -109,8 +114,10 @@ export function ParadaDetalleScreen() {
 
   const handleConfirmarDemora = async (reporteId: string) => {
     try {
-      // Vibración háptica corta al confirmar el reporte ajeno
-      Vibration.vibrate(40);
+      // Vibración háptica corta mediante expo-haptics al confirmar un reporte ajeno
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+        () => {},
+      );
       const res = await confirmarReporte(reporteId);
       setReportes((prev) =>
         prev.map((r) => (r.id === reporteId ? res.datos : r)),
@@ -132,13 +139,21 @@ export function ParadaDetalleScreen() {
     });
   };
 
-  const handleToggleRecordatorio = (numeroLinea: string, horaColectivo: string) => {
+  const handleToggleRecordatorio = async (
+    numeroLinea: string,
+    horaColectivo: string,
+  ) => {
     const clave = `${numeroLinea}-${horaColectivo}`;
+    await Haptics.selectionAsync().catch(() => {});
 
     if (recordatoriosActivos[clave]) {
       if (timersRecordatorioRef.current[clave]) {
         clearTimeout(timersRecordatorioRef.current[clave]);
         delete timersRecordatorioRef.current[clave];
+      }
+      if (notificacionesIdsRef.current[clave]) {
+        await cancelarRecordatorioColectivo(notificacionesIdsRef.current[clave]);
+        delete notificacionesIdsRef.current[clave];
       }
       setRecordatoriosActivos((prev) => ({ ...prev, [clave]: false }));
       Alert.alert(
@@ -161,7 +176,20 @@ export function ParadaDetalleScreen() {
 
     setRecordatoriosActivos((prev) => ({ ...prev, [clave]: true }));
 
-    if (diferenciaMin > 0) {
+    const segundosParaDisparo =
+      diferenciaMin > 0 ? diferenciaMin * 60 : 5;
+
+    const notifId = await programarRecordatorioColectivo({
+      numeroLinea,
+      horaColectivo,
+      nombreParada: parada.nombre,
+      segundosParaDisparo,
+    });
+
+    if (notifId) {
+      notificacionesIdsRef.current[clave] = notifId;
+    } else if (diferenciaMin > 0) {
+      // Fallback de aviso en pantalla si las notificaciones del sistema están restringidas
       timersRecordatorioRef.current[clave] = setTimeout(() => {
         Alert.alert(
           `🚌 Línea ${numeroLinea} en 10 minutos`,

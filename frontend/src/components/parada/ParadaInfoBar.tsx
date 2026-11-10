@@ -1,5 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Location from "expo-location";
+import { Magnetometer } from "expo-sensors";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -36,17 +37,39 @@ export const ParadaInfoBar: React.FC<ParadaInfoBarProps> = ({
   const { paleta } = useThemeContext();
   const [rumboDispositivo, setRumboDispositivo] = useState<number>(0);
 
-  // Escucha de brújula / magnetómetro del dispositivo cuando está disponible
+  // Escucha de brújula / magnetómetro del dispositivo mediante expo-sensors (y expo-location como respaldo)
   useEffect(() => {
-    let sub: Location.LocationSubscription | null = null;
+    let subMagnetometro: { remove: () => void } | null = null;
+    let subHeading: Location.LocationSubscription | null = null;
     let cancelado = false;
 
-    async function iniciarBrujula() {
+    async function iniciarSensoresOrientacion() {
       try {
+        if (Platform.OS !== "web") {
+          const disponible = await Magnetometer.isAvailableAsync().catch(
+            () => false,
+          );
+          if (disponible && !cancelado) {
+            Magnetometer.setUpdateInterval(400);
+            subMagnetometro = Magnetometer.addListener((data) => {
+              if (cancelado) return;
+              const { x, y } = data;
+              let angulo = Math.atan2(y, x) * (180 / Math.PI);
+              angulo = angulo >= 0 ? angulo : angulo + 360;
+              const rumboMag = (360 - angulo + 90) % 360;
+              if (!Number.isNaN(rumboMag)) {
+                setRumboDispositivo(rumboMag);
+              }
+            });
+            return;
+          }
+        }
+
+        // Respaldo con Location.watchHeadingAsync si el magnetómetro directo no está activo
         const { status } = await Location.getForegroundPermissionsAsync();
         if (status !== "granted" || cancelado) return;
 
-        sub = await Location.watchHeadingAsync((headingData) => {
+        subHeading = await Location.watchHeadingAsync((headingData) => {
           if (!cancelado) {
             const rumbo =
               headingData.trueHeading >= 0
@@ -62,11 +85,12 @@ export const ParadaInfoBar: React.FC<ParadaInfoBarProps> = ({
       }
     }
 
-    iniciarBrujula();
+    iniciarSensoresOrientacion();
 
     return () => {
       cancelado = true;
-      sub?.remove();
+      subMagnetometro?.remove();
+      subHeading?.remove();
     };
   }, []);
 

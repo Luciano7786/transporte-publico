@@ -40,8 +40,28 @@ const linea = (
   color,
   empresa,
   recorridos: [
-    { sentido: "ida", destino: `hacia ${a}`, trazado: [], paradaIds: [] },
-    { sentido: "vuelta", destino: `hacia ${b}`, trazado: [], paradaIds: [] },
+    {
+      sentido: "ida",
+      destino: `hacia ${b}`,
+      trazado: [
+        { latitud: -31.732, longitud: -60.529 },
+        { latitud: -31.7333, longitud: -60.5241 },
+        { latitud: -31.735, longitud: -60.522 },
+        { latitud: -31.741, longitud: -60.518 },
+      ],
+      paradaIds: ["par-102", "par-101", "par-104", "par-108"],
+    },
+    {
+      sentido: "vuelta",
+      destino: `hacia ${a}`,
+      trazado: [
+        { latitud: -31.741, longitud: -60.518 },
+        { latitud: -31.735, longitud: -60.522 },
+        { latitud: -31.7333, longitud: -60.5241 },
+        { latitud: -31.732, longitud: -60.529 },
+      ],
+      paradaIds: ["par-108", "par-104", "par-101", "par-102"],
+    },
   ],
   activa: true,
 });

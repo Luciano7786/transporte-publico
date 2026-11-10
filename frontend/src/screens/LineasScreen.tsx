@@ -1,7 +1,10 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -10,7 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useThemeContext } from "../hooks/use-theme-context";
 import { obtenerAvisos, obtenerLineas } from "../services/lineas.service";
-import type { Aviso, Linea } from "../types";
+import type { Linea } from "../types";
 
 export function LinesScreen() {
   const navigation = useNavigation<any>();
@@ -18,45 +21,55 @@ export function LinesScreen() {
 
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [lineasConDesvio, setLineasConDesvio] = useState<string[]>([]);
+  const [cargando, setCargando] = useState<boolean>(true);
+  const [refrescando, setRefrescando] = useState<boolean>(false);
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+
+  const cargarLineas = async (esRefresco = false) => {
+    try {
+      if (esRefresco) {
+        setRefrescando(true);
+      } else {
+        setCargando(true);
+      }
+      setErrorCarga(null);
+
+      const [resLineas, resAvisos] = await Promise.allSettled([
+        obtenerLineas(),
+        obtenerAvisos(),
+      ]);
+
+      if (resLineas.status === "fulfilled") {
+        setLineas(resLineas.value.datos);
+      } else {
+        setErrorCarga(
+          resLineas.reason?.message ||
+            "No se pudieron cargar las líneas urbanas.",
+        );
+      }
+
+      if (resAvisos.status === "fulfilled") {
+        const ahora = new Date().toISOString();
+        const desviosVigentes = resAvisos.value.datos.filter(
+          (a) =>
+            a.gravedad === "desvio" &&
+            a.desde <= ahora &&
+            (!a.hasta || a.hasta >= ahora),
+        );
+
+        const idsAfectadas = desviosVigentes.flatMap((d) => d.lineaIds);
+        setLineasConDesvio(idsAfectadas);
+      }
+    } catch (err: any) {
+      setErrorCarga(err?.message || "No se pudieron cargar las líneas.");
+    } finally {
+      setCargando(false);
+      setRefrescando(false);
+    }
+  };
 
   useEffect(() => {
-    let activo = true;
-
-    async function cargarLineas() {
-      try {
-        const [resLineas, resAvisos] = await Promise.allSettled([
-          obtenerLineas(),
-          obtenerAvisos(),
-        ]);
-
-        if (activo) {
-          if (resLineas.status === "fulfilled") {
-            setLineas(resLineas.value.datos);
-          }
-
-          if (resAvisos.status === "fulfilled") {
-            const ahora = new Date().toISOString();
-            const desviosVigentes = resAvisos.value.datos.filter(
-              (a) =>
-                a.gravedad === "desvio" &&
-                a.desde <= ahora &&
-                (!a.hasta || a.hasta >= ahora),
-            );
-
-            const idsAfectadas = desviosVigentes.flatMap((d) => d.lineaIds);
-            setLineasConDesvio(idsAfectadas);
-          }
-        }
-      } catch (err) {
-        console.warn("Error cargando líneas:", err);
-      }
-    }
-
-    cargarLineas();
-
-    return () => {
-      activo = false;
-    };
+    cargarLineas(false);
   }, []);
 
   const handleSelectLinea = (lineaId: string) => {
@@ -75,13 +88,60 @@ export function LinesScreen() {
         </Text>
       </View>
 
-      {/* Listado de Líneas */}
-      <FlatList
-        data={lineas}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => {
+      {cargando && lineas.length === 0 ? (
+        <View style={styles.estadoContainer}>
+          <ActivityIndicator size="large" color={paleta.acento} />
+          <Text style={[styles.estadoMensaje, { color: paleta.textoMedio }]}>
+            Cargando líneas urbanas...
+          </Text>
+        </View>
+      ) : errorCarga && lineas.length === 0 ? (
+        <View style={styles.estadoContainer}>
+          <Ionicons
+            name="cloud-offline-outline"
+            size={38}
+            color={paleta.advertencia}
+          />
+          <Text style={[styles.estadoMensaje, { color: paleta.textoMedio }]}>
+            {errorCarga}
+          </Text>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => cargarLineas(false)}
+            style={[styles.botonReintentar, { backgroundColor: paleta.acento }]}
+          >
+            <Text
+              style={[
+                styles.botonReintentarTexto,
+                { color: paleta.textoSobreAcento },
+              ]}
+            >
+              Reintentar
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        /* Listado de Líneas */
+        <FlatList
+          data={lineas}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refrescando}
+              onRefresh={() => cargarLineas(true)}
+              tintColor={paleta.acento}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.estadoContainer}>
+              <Text style={[styles.estadoMensaje, { color: paleta.textoMedio }]}>
+                No hay líneas disponibles en este momento.
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => {
           const tieneDesvio = lineasConDesvio.includes(item.id);
 
           return (
@@ -148,7 +208,8 @@ export function LinesScreen() {
             </TouchableOpacity>
           );
         }}
-      />
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -156,6 +217,28 @@ export function LinesScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+  },
+  estadoContainer: {
+    flex: 1,
+    padding: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  estadoMensaje: {
+    fontSize: 15,
+    textAlign: "center",
+    lineHeight: 21,
+  },
+  botonReintentar: {
+    marginTop: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  botonReintentarTexto: {
+    fontSize: 14,
+    fontWeight: "700",
   },
   header: {
     paddingHorizontal: 18,

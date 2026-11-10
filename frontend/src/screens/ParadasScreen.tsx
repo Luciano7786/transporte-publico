@@ -25,6 +25,7 @@ import {
   useUbicacion,
 } from "../hooks/use-ubicacion";
 import { obtenerAvisos, obtenerLineas } from "../services/lineas.service";
+import { notificarNuevosAvisosEnLineasFavoritas } from "../services/notificaciones.service";
 import {
   calcularProximosHorarios,
   obtenerHorariosPorParada,
@@ -109,8 +110,15 @@ export function ParadasScreen() {
             setLineasCatalogo(resLineas.value.datos);
           }
           if (resAvisos.status === "fulfilled" && resAvisos.value.datos) {
-            const desvio = resAvisos.value.datos.find((a) => a.gravedad === "desvio");
-            setAvisoDestacado(desvio ?? resAvisos.value.datos[0] ?? null);
+            const listaAvisos = resAvisos.value.datos;
+            const desvio = listaAvisos.find((a) => a.gravedad === "desvio");
+            setAvisoDestacado(desvio ?? listaAvisos[0] ?? null);
+
+            notificarNuevosAvisosEnLineasFavoritas(
+              listaAvisos,
+              auth?.lineasFavoritas ?? ["lin-05", "lin-14"],
+              auth?.usuario?.avisosActivos ?? true,
+            ).catch(() => {});
           }
         }
       } catch (err) {
