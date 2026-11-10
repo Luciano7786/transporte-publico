@@ -6,7 +6,8 @@ import {
   obtenerParadaPorQrDeCache,
   obtenerParadasDeCache,
 } from "../db/database";
-import type { Horario, Parada, RespuestaExitosa, Sentido } from "../types";
+import { HORARIOS_MOCK } from "../mocks/horarios.mock";
+import type { Horario, Parada, RespuestaExitosa, Sentido, TipoDeDia } from "../types";
 import { clienteHttp } from "./cliente";
 import { ErrorApi } from "./error.service";
 
@@ -128,13 +129,14 @@ export const obtenerParadaPorQr = async (
 };
 
 /**
- * Obtiene los horarios de tabla para una parada (y opcionalmente una línea o sentido).
+ * Obtiene los horarios de tabla para una parada (y opcionalmente una línea, sentido o tipo de día).
  * Estrategia de Resiliencia: persiste los horarios en cache_horarios y responde con ellos sin red.
  */
 export const obtenerHorariosPorParada = async (
   paradaId: string,
   lineaId?: string,
   sentido?: Sentido,
+  dia?: TipoDeDia,
 ): Promise<RespuestaExitosa<Horario[]>> => {
   const lineaKey = lineaId ?? "todas";
   const sentidoKey = sentido ?? "todos";
@@ -145,9 +147,10 @@ export const obtenerHorariosPorParada = async (
     params.set("porPagina", "1000");
     if (lineaId) params.set("lineaId", lineaId);
     if (sentido) params.set("sentido", sentido);
+    if (dia) params.set("dia", dia);
 
     const res = await clienteHttp<Horario[]>(`/horarios?${params.toString()}`);
-    if (res.datos && res.datos.length > 0) {
+    if (res.datos && res.datos.length > 0 && !dia) {
       guardarHorariosEnCache(paradaId, lineaKey, sentidoKey, res.datos).catch((err) =>
         console.warn("No se pudo cachear horarios en SQLite:", err),
       );
@@ -155,14 +158,20 @@ export const obtenerHorariosPorParada = async (
     return res;
   } catch (error) {
     if (esErrorDeConexion(error)) {
-      const horariosCache = await obtenerHorariosDeCache(paradaId, lineaKey, sentidoKey);
+      let horariosCache = await obtenerHorariosDeCache(paradaId, lineaKey, sentidoKey);
+      if (!horariosCache || horariosCache.length === 0) {
+        horariosCache = HORARIOS_MOCK.filter((h) => h.paradaId === paradaId);
+      }
       if (horariosCache && horariosCache.length > 0) {
+        const filtrados = dia
+          ? horariosCache.filter((h) => h.tipoDeDia === dia)
+          : horariosCache;
         return {
-          datos: horariosCache,
+          datos: filtrados,
           meta: {
-            total: horariosCache.length,
+            total: filtrados.length,
             pagina: 1,
-            porPagina: horariosCache.length,
+            porPagina: filtrados.length,
           },
         };
       }
@@ -170,6 +179,16 @@ export const obtenerHorariosPorParada = async (
     throw error;
   }
 };
+
+/**
+ * Determina el tipo de día actual ("habil", "sabado", "domingo") según la fecha del dispositivo.
+ */
+export function obtenerTipoDeDiaActual(fecha = new Date()): TipoDeDia {
+  const diaSemana = fecha.getDay();
+  if (diaSemana === 0) return "domingo";
+  if (diaSemana === 6) return "sabado";
+  return "habil";
+}
 
 /**
  * Consulta en la API los próximos pasos de colectivos en una parada dada según la hora actual.
@@ -189,26 +208,41 @@ export const obtenerProximosHorariosApi = (
 };
 
 /**
- * Calcula los próximos horarios de una línea en una parada a partir de una hora de referencia (HH:MM).
- * Si no se pasa horaReferencia, toma la hora del sistema (o 10:34 como fallback de maqueta).
+ * Calcula los próximos horarios de una línea en una parada a partir de una hora de referencia (HH:MM)
+ * y opcionalmente un tipo de día ("habil", "sabado", "domingo", "feriado").
+ * Si no se pasa horaReferencia, toma la hora real del reloj del dispositivo.
  */
 export function calcularProximosHorarios(
   horarios: Horario[],
   lineaId: string,
   horaReferencia?: string,
   cantidad = 3,
+  tipoDeDia?: TipoDeDia,
 ): {
   proximos: string[];
+  todosDelDia: string[];
   finalizoServicio: boolean;
   primerHorarioManana?: string;
+  ultimoHorarioHoy?: string;
   minutosFaltantesPrimerHorario?: number;
 } {
-  const horariosLinea = horarios
-    .filter((h) => h.lineaId === lineaId)
-    .sort((a, b) => a.hora.localeCompare(b.hora));
+  let filtradosPorLinea = horarios.filter((h) => h.lineaId === lineaId);
 
-  if (horariosLinea.length === 0) {
-    return { proximos: [], finalizoServicio: false };
+  if (tipoDeDia) {
+    const porDia = filtradosPorLinea.filter((h) => h.tipoDeDia === tipoDeDia);
+    // Si hay horarios cargados para ese tipo de día, los usamos; si no, caemos a los hábiles disponibles
+    if (porDia.length > 0) {
+      filtradosPorLinea = porDia;
+    }
+  }
+
+  // Quitamos duplicados de hora y ordenamos ascendentemente
+  const horasUnicas = Array.from(new Set(filtradosPorLinea.map((h) => h.hora))).sort((a, b) =>
+    a.localeCompare(b),
+  );
+
+  if (horasUnicas.length === 0) {
+    return { proximos: [], todosDelDia: [], finalizoServicio: false };
   }
 
   // Hora actual del sistema en formato HH:MM si no se especifica
@@ -220,17 +254,21 @@ export function calcularProximosHorarios(
     horaRef = `${hh}:${mm}`;
   }
 
-  const futuros = horariosLinea.filter((h) => h.hora >= horaRef);
+  const futuros = horasUnicas.filter((hora) => hora >= horaRef!);
+  const primerHorarioManana = horasUnicas[0];
+  const ultimoHorarioHoy = horasUnicas[horasUnicas.length - 1];
 
   if (futuros.length === 0) {
     return {
       proximos: [],
+      todosDelDia: horasUnicas,
       finalizoServicio: true,
-      primerHorarioManana: horariosLinea[0].hora,
+      primerHorarioManana,
+      ultimoHorarioHoy,
     };
   }
 
-  const seleccionados = futuros.slice(0, cantidad).map((h) => h.hora);
+  const seleccionados = futuros.slice(0, cantidad);
 
   // Cálculo de minutos restantes para el primero
   const [refH, refM] = horaRef.split(":").map(Number);
@@ -239,7 +277,10 @@ export function calcularProximosHorarios(
 
   return {
     proximos: seleccionados,
+    todosDelDia: horasUnicas,
     finalizoServicio: false,
+    primerHorarioManana,
+    ultimoHorarioHoy,
     minutosFaltantesPrimerHorario: Math.max(0, minutosFaltantes),
   };
 }

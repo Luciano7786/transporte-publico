@@ -54,6 +54,45 @@ export function formatearDistancia(metros: number): string {
   return `a ${km} km`;
 }
 
+/**
+ * Calcula el rumbo (azimut / bearing) en grados (0° = Norte, 90° = Este, 180° = Sur, 270° = Oeste)
+ * desde una coordenada origen hacia una coordenada destino.
+ */
+export function calcularRumboGrados(
+  origen: Coordenadas,
+  destino: Coordenadas,
+): number {
+  const radLat1 = (origen.latitud * Math.PI) / 180;
+  const radLat2 = (destino.latitud * Math.PI) / 180;
+  const deltaLon = ((destino.longitud - origen.longitud) * Math.PI) / 180;
+
+  const y = Math.sin(deltaLon) * Math.cos(radLat2);
+  const x =
+    Math.cos(radLat1) * Math.sin(radLat2) -
+    Math.sin(radLat1) * Math.cos(radLat2) * Math.cos(deltaLon);
+
+  const brng = (Math.atan2(y, x) * 180) / Math.PI;
+  return (brng + 360) % 360;
+}
+
+/**
+ * Devuelve el punto cardinal en español según el ángulo en grados (0-360).
+ */
+export function obtenerPuntoCardinal(grados: number): string {
+  const direcciones = [
+    "Norte",
+    "Noreste",
+    "Este",
+    "Sureste",
+    "Sur",
+    "Suroeste",
+    "Oeste",
+    "Noroeste",
+  ];
+  const indice = Math.round(((grados %= 360) < 0 ? grados + 360 : grados) / 45) % 8;
+  return direcciones[indice];
+}
+
 export interface EstadoUbicacion {
   coordenadas: Coordenadas;
   esReal: boolean;

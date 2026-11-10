@@ -99,13 +99,14 @@ export function LineaDetalleScreen() {
           const todasParadas =
             resParadas.status === "fulfilled" ? resParadas.value.datos : [];
 
-          // Construir lista con estados para Línea 7
-          const recorridoActual =
-            resLinea.status === "fulfilled"
-              ? resLinea.value.datos.recorridos.find(
-                  (r) => r.sentido === sentido,
-                )
-              : null;
+          const lineaRecibida =
+            resLinea.status === "fulfilled" ? resLinea.value.datos : linea;
+          const avisoRecibido =
+            resAviso.status === "fulfilled" ? resAviso.value : aviso;
+
+          const recorridoActual = lineaRecibida.recorridos.find(
+            (r) => r.sentido === sentido,
+          );
 
           const ids = recorridoActual?.paradaIds ?? [
             "par-102",
@@ -114,12 +115,16 @@ export function LineaDetalleScreen() {
             "par-109",
           ];
 
+          const tieneDesvioActivo =
+            avisoRecibido?.gravedad === "desvio" &&
+            avisoRecibido.lineaIds.includes(lineaRecibida.id);
+
           const items: ItemParadaTimeline[] = ids.map((id) => {
             const encontrada = todasParadas.find((p) => p.id === id);
             let estado: "normal" | "sin_servicio" | "provisoria" = "normal";
 
-            // En sentido IDA con el desvío de calle Corrientes
-            if (sentido === "ida") {
+            // Solo marcamos paradas afectadas si la línea tiene un desvío activo en sentido ida
+            if (sentido === "ida" && tieneDesvioActivo) {
               if (id === "par-103") estado = "sin_servicio"; // Corrientes y 25 de Mayo
               if (id === "par-104") estado = "provisoria"; // Santa Fe y Urquiza
             }
@@ -196,10 +201,16 @@ export function LineaDetalleScreen() {
         <MapaRecorrido
           trazadoNormal={recorridoActual?.trazado ?? []}
           trazadoAlternativo={
-            sentido === "ida" ? aviso?.trazadoAlternativo : null
+            sentido === "ida" && aviso?.gravedad === "desvio"
+              ? aviso.trazadoAlternativo
+              : null
           }
           colorLinea={linea.color}
-          totalParadas={14}
+          totalParadas={
+            paradasMapeadas.length > 0
+              ? paradasMapeadas.length
+              : (recorridoActual?.paradaIds.length ?? 4)
+          }
         />
 
         {/* 5. Timeline vertical de paradas */}

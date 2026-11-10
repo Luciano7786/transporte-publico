@@ -2,6 +2,7 @@
 import * as SQLite from "expo-sqlite";
 import { Platform } from "react-native";
 import { LINEAS_MOCK } from "../mocks/lineas.mock";
+import { HORARIOS_MOCK } from "../mocks/horarios.mock";
 import { PARADAS_MOCK } from "../mocks/paradas.mock";
 import type { Horario, Linea, MotivoDemora, Parada, Sentido } from "../types";
 
@@ -133,6 +134,21 @@ async function inicializarTablas(db: SQLite.SQLiteDatabase): Promise<void> {
             linea.activa ? 1 : 0,
             JSON.stringify(linea),
           ],
+        );
+      }
+    }
+
+    const cantHorarios = await db.getFirstAsync<{ cantidad: number }>(
+      "SELECT COUNT(*) AS cantidad FROM cache_horarios;",
+    );
+    if (!cantHorarios || cantHorarios.cantidad === 0) {
+      const paradasIds = Array.from(new Set(HORARIOS_MOCK.map((h) => h.paradaId)));
+      for (const pId of paradasIds) {
+        const horariosParada = HORARIOS_MOCK.filter((h) => h.paradaId === pId);
+        await db.runAsync(
+          `INSERT OR REPLACE INTO cache_horarios (paradaId, lineaId, sentido, json_completo)
+           VALUES (?, ?, ?, ?);`,
+          [pId, "todas", "todos", JSON.stringify(horariosParada)],
         );
       }
     }

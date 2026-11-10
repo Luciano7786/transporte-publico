@@ -1,5 +1,5 @@
 import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -14,21 +14,29 @@ import { LineaHorarioCard } from "../components/parada/LineaHorarioCard";
 import { ParadaHeader } from "../components/parada/ParadaHeader";
 import { ParadaInfoBar } from "../components/parada/ParadaInfoBar";
 import { useThemeContext } from "../hooks/use-theme-context";
+import {
+  calcularDistanciaMetros,
+  useUbicacion,
+} from "../hooks/use-ubicacion";
 import { obtenerLineas } from "../services/lineas.service";
 import {
   calcularProximosHorarios,
   obtenerHorariosPorParada,
   obtenerParadaPorId,
+  obtenerTipoDeDiaActual,
 } from "../services/paradas.service";
 import {
   confirmarReporte,
   obtenerReportesPorParada,
 } from "../services/reportes.service";
-import {
-  calcularDistanciaMetros,
-  useUbicacion,
-} from "../hooks/use-ubicacion";
-import type { Horario, Linea, Parada, ReporteDeDemora } from "../types";
+import type { Horario, Linea, Parada, ReporteDeDemora, TipoDeDia } from "../types";
+
+const OPCIONES_DIA: Array<{ id: TipoDeDia; label: string }> = [
+  { id: "habil", label: "Hábiles" },
+  { id: "sabado", label: "Sábados" },
+  { id: "domingo", label: "Domingos" },
+  { id: "feriado", label: "Feriados" },
+];
 
 export function ParadaDetalleScreen() {
   const navigation = useNavigation<any>();
@@ -58,6 +66,11 @@ export function ParadaDetalleScreen() {
   const [reportes, setReportes] = useState<ReporteDeDemora[]>([]);
   const [reportesConfirmados, setReportesConfirmados] = useState<string[]>([]);
   const [esFavorita, setEsFavorita] = useState<boolean>(true);
+  const [tipoDiaSeleccionado, setTipoDiaSeleccionado] = useState<TipoDeDia>(() =>
+    obtenerTipoDeDiaActual(),
+  );
+  const [recordatoriosActivos, setRecordatoriosActivos] = useState<Record<string, boolean>>({});
+  const timersRecordatorioRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
     let activo = true;
@@ -87,6 +100,7 @@ export function ParadaDetalleScreen() {
 
     return () => {
       activo = false;
+      Object.values(timersRecordatorioRef.current).forEach(clearTimeout);
     };
   }, [paradaId]);
 
@@ -113,42 +127,98 @@ export function ParadaDetalleScreen() {
     });
   };
 
-  // Configuramos las dos líneas principales según la maqueta
+  const handleToggleRecordatorio = (numeroLinea: string, horaColectivo: string) => {
+    const clave = `${numeroLinea}-${horaColectivo}`;
+
+    if (recordatoriosActivos[clave]) {
+      if (timersRecordatorioRef.current[clave]) {
+        clearTimeout(timersRecordatorioRef.current[clave]);
+        delete timersRecordatorioRef.current[clave];
+      }
+      setRecordatoriosActivos((prev) => ({ ...prev, [clave]: false }));
+      Alert.alert(
+        "Recordatorio cancelado",
+        `Desactivaste el aviso para la Línea ${numeroLinea} de las ${horaColectivo}.`,
+      );
+      return;
+    }
+
+    // Calculamos cuánto falta para 10 minutos antes del colectivo
+    const ahora = new Date();
+    const [hh, mm] = horaColectivo.split(":").map(Number);
+    const minutosObjetivo = hh * 60 + mm - 10;
+    const minutosActuales = ahora.getHours() * 60 + ahora.getMinutes();
+    const diferenciaMin = minutosObjetivo - minutosActuales;
+
+    const horaAvisoH = String(Math.floor(((minutosObjetivo + 1440) % 1440) / 60)).padStart(2, "0");
+    const horaAvisoM = String(((minutosObjetivo + 1440) % 1440) % 60).padStart(2, "0");
+    const horaAvisoTexto = `${horaAvisoH}:${horaAvisoM}`;
+
+    setRecordatoriosActivos((prev) => ({ ...prev, [clave]: true }));
+
+    if (diferenciaMin > 0) {
+      timersRecordatorioRef.current[clave] = setTimeout(() => {
+        Alert.alert(
+          `🚌 Línea ${numeroLinea} en 10 minutos`,
+          `El colectivo de las ${horaColectivo} está próximo a pasar por ${parada.nombre} (según tabla).`,
+        );
+        setRecordatoriosActivos((prev) => ({ ...prev, [clave]: false }));
+      }, diferenciaMin * 60 * 1000);
+    }
+
+    Alert.alert(
+      "Recordatorio programado",
+      diferenciaMin > 0
+        ? `Te vamos a avisar a las ${horaAvisoTexto} (10 minutos antes del servicio de las ${horaColectivo} de la Línea ${numeroLinea}).`
+        : `Faltan menos de 10 minutos para el colectivo de las ${horaColectivo} de la Línea ${numeroLinea}. ¡Acercate a la parada!`,
+    );
+  };
+
+  // Configuramos todas las líneas que pasan por la parada según el día seleccionado y la hora actual real
   const infoLineas = parada.lineaIds.map((lId) => {
     const lObj = lineas.find((l) => l.id === lId);
-    const numero = lObj?.numero ?? (lId === "lin-05" ? "5" : "14");
+    const numero = lObj?.numero ?? lId.replace("lin-0", "").replace("lin-", "");
     const color =
       lObj?.color ?? (lId === "lin-05" ? "#1B6CA8" : "#B45309");
 
-    // Recorrido de ida según PDF
+    // Destino según sentido de la parada
+    const recorridoParada = lObj?.recorridos.find(
+      (r) => r.sentido === parada.sentido,
+    );
     const destino =
-      lId === "lin-05"
-        ? "hacia Puerto Viejo"
-        : "hacia Bajada Grande";
+      recorridoParada?.destino ??
+      (lId === "lin-05" ? "hacia Puerto Viejo" : "hacia Bajada Grande");
 
-    const calc = calcularProximosHorarios(horarios, lId, "10:34", 3);
+    const calc = calcularProximosHorarios(
+      horarios,
+      lId,
+      undefined, // Usa la hora real del reloj del dispositivo
+      3,
+      tipoDiaSeleccionado,
+    );
 
-    // En la maqueta, para la Línea 5 se muestra explícitamente "en 8 min, según tabla"
     const etiquetaMinutos =
-      lId === "lin-05" && calc.minutosFaltantesPrimerHorario !== undefined
-        ? `en ${calc.minutosFaltantesPrimerHorario} min, según tabla`
+      calc.minutosFaltantesPrimerHorario !== undefined
+        ? calc.minutosFaltantesPrimerHorario === 0
+          ? "llegando ahora, según tabla"
+          : `en ${calc.minutosFaltantesPrimerHorario} min, según tabla`
         : undefined;
+
+    const proximoHora = calc.proximos[0] ?? (lId === "lin-05" ? "10:42" : "10:51");
 
     return {
       id: lId,
       numero,
       destino,
       color,
-      proximo: calc.proximos[0] ?? (lId === "lin-05" ? "10:42" : "10:51"),
-      siguientes:
-        calc.proximos.length > 1
-          ? calc.proximos.slice(1)
-          : lId === "lin-05"
-            ? ["11:02", "11:22"]
-            : ["11:21", "11:51"],
+      proximo: proximoHora,
+      siguientes: calc.proximos.length > 1 ? calc.proximos.slice(1) : [],
+      todosLosHorarios: calc.todosDelDia,
       etiquetaMinutos,
       finalizoServicio: calc.finalizoServicio,
       primerHorarioManana: calc.primerHorarioManana,
+      ultimoHorarioHoy: calc.ultimoHorarioHoy,
+      recordatorioActivo: Boolean(recordatoriosActivos[`${numero}-${proximoHora}`]),
     };
   });
 
@@ -175,15 +245,50 @@ export function ParadaDetalleScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 2. Barra de orientación y enlace Cómo llegar */}
+        {/* 2. Barra de orientación con brújula/rumbo y enlace Cómo llegar */}
         <ParadaInfoBar
           distancia={distanciaTexto}
-          sentidoTexto="hacia el centro"
+          sentidoTexto={parada.sentido === "ida" ? "hacia el centro" : "sentido vuelta"}
           coordenadas={parada.coordenadas}
+          usuarioCoordenadas={usuarioCoords}
           nombreParada={parada.nombre}
         />
 
-        {/* 3. Tarjetas de cada línea con sus horarios */}
+        {/* 3. Selector de tipo de día (Hábiles / Sábados / Domingos / Feriados) */}
+        <View style={styles.selectorDiaContainer}>
+          {OPCIONES_DIA.map((op) => {
+            const activo = tipoDiaSeleccionado === op.id;
+            return (
+              <TouchableOpacity
+                key={op.id}
+                activeOpacity={0.75}
+                onPress={() => setTipoDiaSeleccionado(op.id)}
+                style={[
+                  styles.chipDia,
+                  activo
+                    ? { backgroundColor: paleta.acento, borderColor: paleta.acento }
+                    : {
+                        backgroundColor: paleta.superficie1,
+                        borderColor: paleta.borde,
+                      },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.chipDiaTexto,
+                    {
+                      color: activo ? paleta.textoSobreAcento : paleta.textoMedio,
+                    },
+                  ]}
+                >
+                  {op.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* 4. Tarjetas de cada línea con sus horarios, tabla completa y recordatorio */}
         {infoLineas.map((item) => (
           <LineaHorarioCard
             key={item.id}
@@ -193,12 +298,16 @@ export function ParadaDetalleScreen() {
             proximo={item.proximo}
             etiquetaMinutos={item.etiquetaMinutos}
             siguientes={item.siguientes}
+            todosLosHorarios={item.todosLosHorarios}
             finalizoServicio={item.finalizoServicio}
             primerHorarioManana={item.primerHorarioManana}
+            ultimoHorarioHoy={item.ultimoHorarioHoy}
+            recordatorioActivo={item.recordatorioActivo}
+            onPressRecordatorio={handleToggleRecordatorio}
           />
         ))}
 
-        {/* 4. Reporte de demoras colaborativo */}
+        {/* 5. Reporte de demoras colaborativo */}
         {reportes.map((rep) => (
           <DemoraReporteCard
             key={rep.id}
@@ -209,7 +318,7 @@ export function ParadaDetalleScreen() {
         ))}
       </ScrollView>
 
-      {/* 5. Botón inferior fijo: Reportar una demora */}
+      {/* 6. Botón inferior fijo: Reportar una demora */}
       <View
         style={[
           styles.footer,
@@ -247,6 +356,24 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 24,
+  },
+  selectorDiaContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    marginBottom: 14,
+    gap: 8,
+  },
+  chipDia: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chipDiaTexto: {
+    fontSize: 12,
+    fontWeight: "700",
   },
   footer: {
     paddingHorizontal: 16,
