@@ -1,5 +1,5 @@
 import { useNavigation } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -12,6 +12,7 @@ import { AvisoCard } from "../components/avisos/AvisoCard";
 import { AvisosHeader } from "../components/avisos/AvisosHeader";
 import { FiltrosAvisos } from "../components/avisos/FiltrosAvisos";
 import { VideoModal } from "../components/avisos/VideoModal";
+import { AuthContext } from "../contexts/AuthContext";
 import { useThemeContext } from "../hooks/use-theme-context";
 import {
   FiltroAvisos,
@@ -25,6 +26,7 @@ import type { Aviso, Linea } from "../types";
 export function AvisosScreen() {
   const navigation = useNavigation<any>();
   const { paleta } = useThemeContext();
+  const auth = useContext(AuthContext);
 
   const [todosAvisos, setTodosAvisos] = useState<Aviso[]>([]);
   const [lineas, setLineas] = useState<Linea[]>([]);
@@ -63,11 +65,11 @@ export function AvisosScreen() {
     setRefrescando(false);
   };
 
-  // Filtrado de avisos según el chip activo
+  // Filtrado de avisos según el chip activo y las líneas favoritas del pasajero
   const avisosFiltrados = filtrarAvisos(
     todosAvisos,
     filtroActual,
-    ["lin-05", "lin-14"],
+    auth?.lineasFavoritas ?? ["lin-05", "lin-14"],
   );
 
   const handleOpenVideo = (videoUrl: string) => {

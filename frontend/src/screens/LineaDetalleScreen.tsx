@@ -1,5 +1,5 @@
 import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LineaAvisoBanner } from "../components/linea/LineaAvisoBanner";
@@ -10,6 +10,7 @@ import {
   ParadasTimeline,
 } from "../components/linea/ParadasTimeline";
 import { SentidoSelector } from "../components/linea/SentidoSelector";
+import { AuthContext } from "../contexts/AuthContext";
 import { useThemeContext } from "../hooks/use-theme-context";
 import {
   obtenerAvisoVigentePorLinea,
@@ -22,8 +23,10 @@ export function LineaDetalleScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { paleta } = useThemeContext();
+  const auth = useContext(AuthContext);
 
   const lineaId = route.params?.lineaId ?? "lin-07";
+  const esFavorita = Boolean(auth?.lineasFavoritas.includes(lineaId));
 
   const [linea, setLinea] = useState<Linea>({
     id: "lin-07",
@@ -167,12 +170,20 @@ export function LineaDetalleScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: paleta.fondoApp }]}
     >
-      {/* 1. Header con volver, badge de línea y nombre */}
+      {/* 1. Header con volver, badge de línea, nombre y favorito */}
       <LineaHeader
         numero={linea.numero}
         nombre={linea.nombre}
         color={linea.color}
-        onPressVolver={() => navigation.goBack()}
+        esFavorita={esFavorita}
+        onPressVolver={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          } else {
+            navigation.navigate("MainTabs");
+          }
+        }}
+        onToggleFavorita={() => auth?.alternarLineaFavorita(linea.id)}
       />
 
       <ScrollView

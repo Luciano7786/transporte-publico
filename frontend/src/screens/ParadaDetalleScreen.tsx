@@ -1,5 +1,5 @@
 import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -13,6 +13,7 @@ import { DemoraReporteCard } from "../components/parada/DemoraReporteCard";
 import { LineaHorarioCard } from "../components/parada/LineaHorarioCard";
 import { ParadaHeader } from "../components/parada/ParadaHeader";
 import { ParadaInfoBar } from "../components/parada/ParadaInfoBar";
+import { AuthContext } from "../contexts/AuthContext";
 import { useThemeContext } from "../hooks/use-theme-context";
 import {
   calcularDistanciaMetros,
@@ -42,9 +43,11 @@ export function ParadaDetalleScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { paleta } = useThemeContext();
+  const auth = useContext(AuthContext);
   const { coordenadas: usuarioCoords } = useUbicacion();
 
   const paradaId = route.params?.paradaId ?? "par-101";
+  const esFavorita = Boolean(auth?.paradasFavoritas.includes(paradaId));
 
   const [parada, setParada] = useState<Parada>({
     id: "par-101",
@@ -65,7 +68,6 @@ export function ParadaDetalleScreen() {
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [reportes, setReportes] = useState<ReporteDeDemora[]>([]);
   const [reportesConfirmados, setReportesConfirmados] = useState<string[]>([]);
-  const [esFavorita, setEsFavorita] = useState<boolean>(true);
   const [tipoDiaSeleccionado, setTipoDiaSeleccionado] = useState<TipoDeDia>(() =>
     obtenerTipoDeDiaActual(),
   );
@@ -237,7 +239,7 @@ export function ParadaDetalleScreen() {
             navigation.navigate("MainTabs");
           }
         }}
-        onToggleFavorita={() => setEsFavorita((prev) => !prev)}
+        onToggleFavorita={() => auth?.alternarParadaFavorita(parada.id)}
       />
 
       <ScrollView

@@ -7,14 +7,18 @@ interface LineaHeaderProps {
   numero: string;
   nombre: string;
   color: string;
+  esFavorita?: boolean;
   onPressVolver: () => void;
+  onToggleFavorita?: () => void;
 }
 
 export const LineaHeader: React.FC<LineaHeaderProps> = ({
   numero,
   nombre,
   color,
+  esFavorita = false,
   onPressVolver,
+  onToggleFavorita,
 }) => {
   const { paleta } = useThemeContext();
 
@@ -49,6 +53,31 @@ export const LineaHeader: React.FC<LineaHeaderProps> = ({
       >
         {nombre}
       </Text>
+
+      {/* Estrella de Favorito */}
+      {onToggleFavorita ? (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={onToggleFavorita}
+          style={[
+            styles.iconButton,
+            {
+              backgroundColor: paleta.superficie1,
+              borderColor: paleta.borde,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={
+            esFavorita ? "Quitar línea de favoritas" : "Marcar línea como favorita"
+          }
+        >
+          <Ionicons
+            name={esFavorita ? "star" : "star-outline"}
+            size={21}
+            color={esFavorita ? "#F59E0B" : paleta.textoMedio}
+          />
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 };

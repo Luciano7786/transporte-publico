@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   StyleSheet,
@@ -17,6 +17,7 @@ import {
   LineaHorariosCard,
   TusParadasCard,
 } from "../components/inicio/TusParadasCard";
+import { AuthContext } from "../contexts/AuthContext";
 import { useThemeContext } from "../hooks/use-theme-context";
 import {
   calcularDistanciaMetros,
@@ -35,6 +36,7 @@ import type { Aviso, Linea, Parada } from "../types";
 export function ParadasScreen() {
   const navigation = useNavigation<any>();
   const { paleta } = useThemeContext();
+  const auth = useContext(AuthContext);
   const { coordenadas: usuarioCoords } = useUbicacion();
 
   const [paradas, setParadas] = useState<Parada[]>([]);
@@ -46,25 +48,34 @@ export function ParadasScreen() {
     { numero: "14", color: "#B45309", proximos: ["10:51", "11:21", "11:51"] },
   ]);
 
-  // Calcula la parada más cercana en base a las coordenadas reales del usuario
-  const paradaMasCercana = useMemo(() => {
+  // Prioriza las paradas favoritas del usuario; si no tiene ninguna marcada, usa la más cercana
+  const paradaDestacada = useMemo(() => {
     if (paradas.length === 0) return null;
-    let cercana = paradas[0];
-    let menorDist = calcularDistanciaMetros(usuarioCoords, cercana.coordenadas);
 
-    for (let i = 1; i < paradas.length; i++) {
-      const dist = calcularDistanciaMetros(usuarioCoords, paradas[i].coordenadas);
+    const idsFavoritas = auth?.paradasFavoritas ?? [];
+    const favoritasDisponibles = paradas.filter((p) =>
+      idsFavoritas.includes(p.id),
+    );
+    const pool =
+      favoritasDisponibles.length > 0 ? favoritasDisponibles : paradas;
+
+    let elegida = pool[0];
+    let menorDist = calcularDistanciaMetros(usuarioCoords, elegida.coordenadas);
+
+    for (let i = 1; i < pool.length; i++) {
+      const dist = calcularDistanciaMetros(usuarioCoords, pool[i].coordenadas);
       if (dist < menorDist) {
         menorDist = dist;
-        cercana = paradas[i];
+        elegida = pool[i];
       }
     }
 
     return {
-      parada: cercana,
+      parada: elegida,
       distanciaMetros: menorDist,
+      esFavorita: idsFavoritas.includes(elegida.id),
     };
-  }, [paradas, usuarioCoords]);
+  }, [paradas, usuarioCoords, auth?.paradasFavoritas]);
 
   // Filtra las paradas en tiempo real por nombre o calle (funciona incluso sin permiso de GPS)
   const paradasFiltradas = useMemo(() => {
@@ -114,10 +125,10 @@ export function ParadasScreen() {
     };
   }, []);
 
-  // Actualiza los próximos horarios de la parada más cercana usando la hora real del sistema
+  // Actualiza los próximos horarios de la parada destacada (favorita o más cercana) usando la hora real del sistema
   useEffect(() => {
     let activo = true;
-    const paradaObjetivo = paradaMasCercana?.parada;
+    const paradaObjetivo = paradaDestacada?.parada;
     const idParada = paradaObjetivo?.id ?? "par-101";
     const idsLineas = paradaObjetivo?.lineaIds ?? ["lin-05", "lin-14"];
 
@@ -172,7 +183,7 @@ export function ParadasScreen() {
     return () => {
       activo = false;
     };
-  }, [paradaMasCercana?.parada.id, lineasCatalogo]);
+  }, [paradaDestacada?.parada.id, lineasCatalogo]);
 
   const handleQrPress = () => {
     navigation.navigate("EscanearQr");
@@ -291,14 +302,14 @@ export function ParadasScreen() {
       ) : (
         <>
           <TusParadasCard
-            nombreParada={paradaMasCercana?.parada.nombre ?? "Alameda y Urquiza"}
+            nombreParada={paradaDestacada?.parada.nombre ?? "Alameda y Urquiza"}
             distancia={
-              paradaMasCercana
-                ? formatearDistancia(paradaMasCercana.distanciaMetros)
+              paradaDestacada
+                ? formatearDistancia(paradaDestacada.distanciaMetros)
                 : "a 120 m"
             }
             lineas={lineasCard}
-            onPress={() => handleParadaPress(paradaMasCercana?.parada)}
+            onPress={() => handleParadaPress(paradaDestacada?.parada)}
           />
 
           <AvisosHoyCard
