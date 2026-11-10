@@ -14,6 +14,9 @@ export const COORDENADAS_PARANA_DEFAULT: Coordenadas = {
   longitud: -60.5241,
 };
 
+/** Radio máximo (50 km) alrededor de Paraná en el que se considera válida la ubicación del usuario. */
+const RADIO_SERVICIO_METROS = 50_000;
+
 /**
  * Calcula la distancia ortodrómica en metros entre dos puntos geográficos (Fórmula de Haversine).
  */
@@ -108,11 +111,14 @@ export function useUbicacion(): EstadoUbicacion {
       );
 
       if (ultimaConocida) {
-        setCoordenadas({
+        const previa: Coordenadas = {
           latitud: ultimaConocida.coords.latitude,
           longitud: ultimaConocida.coords.longitude,
-        });
-        setEsReal(true);
+        };
+        if (calcularDistanciaMetros(previa, COORDENADAS_PARANA_DEFAULT) <= RADIO_SERVICIO_METROS) {
+          setCoordenadas(previa);
+          setEsReal(true);
+        }
       }
 
       // 4. Obtener ubicación actual con precisión balanceada
@@ -120,11 +126,19 @@ export function useUbicacion(): EstadoUbicacion {
         accuracy: Location.Accuracy.Balanced,
       });
 
-      setCoordenadas({
+      const real: Coordenadas = {
         latitud: pos.coords.latitude,
         longitud: pos.coords.longitude,
-      });
-      setEsReal(true);
+      };
+
+      // Fuera del área de servicio (ej: emulador ubicado en California): usar el centro de Paraná
+      if (calcularDistanciaMetros(real, COORDENADAS_PARANA_DEFAULT) > RADIO_SERVICIO_METROS) {
+        setCoordenadas(COORDENADAS_PARANA_DEFAULT);
+        setEsReal(false);
+      } else {
+        setCoordenadas(real);
+        setEsReal(true);
+      }
     } catch (err: any) {
       // Si el emulador no tiene señal GPS activa, cae elegantemente en el centro de Paraná
       setError(err?.message || "Servicio de ubicación no disponible");

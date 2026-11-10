@@ -1,35 +1,8 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_DEFAULT, UrlTile } from "react-native-maps";
 import { useThemeContext } from "../../hooks/use-theme-context";
 import type { Coordenadas } from "../../types";
-
-const DARK_MAP_STYLE = [
-  { elementType: "geometry", stylers: [{ color: "#11161b" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#11161b" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#6e7987" }] },
-  {
-    featureType: "administrative.locality",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#95a2b3" }],
-  },
-  { featureType: "poi", stylers: [{ visibility: "off" }] },
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [{ color: "#1e2631" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#141920" }],
-  },
-  {
-    featureType: "water",
-    elementType: "geometry",
-    stylers: [{ color: "#090d11" }],
-  },
-];
+import { MapaLeaflet, type LineaMapa, type PuntoMapa } from "../mapa/MapaLeaflet";
 
 interface MapaRecorridoProps {
   trazadoNormal: Coordenadas[];
@@ -37,6 +10,8 @@ interface MapaRecorridoProps {
   colorLinea: string;
   totalParadas?: number;
 }
+
+const CENTRO_DEFAULT: Coordenadas = { latitud: -31.7345, longitud: -60.523 };
 
 export const MapaRecorrido: React.FC<MapaRecorridoProps> = ({
   trazadoNormal,
@@ -46,22 +21,55 @@ export const MapaRecorrido: React.FC<MapaRecorridoProps> = ({
 }) => {
   const { paleta, temaActual } = useThemeContext();
 
-  const coordsNormales = trazadoNormal.map((c) => ({
-    latitude: c.latitud,
-    longitude: c.longitud,
-  }));
+  const lineas = useMemo<LineaMapa[]>(() => {
+    const resultado: LineaMapa[] = [];
+    if (trazadoNormal.length > 1) {
+      resultado.push({ puntos: trazadoNormal, color: colorLinea });
+    }
+    if (trazadoAlternativo && trazadoAlternativo.length > 1) {
+      resultado.push({ puntos: trazadoAlternativo, color: "#f5a524", punteada: true });
+    }
+    return resultado;
+  }, [trazadoNormal, trazadoAlternativo, colorLinea]);
 
-  const coordsAlternativas = (trazadoAlternativo ?? []).map((c) => ({
-    latitude: c.latitud,
-    longitude: c.longitud,
-  }));
+  // Marcadores de inicio y fin del recorrido normal
+  const puntos = useMemo<PuntoMapa[]>(() => {
+    const resultado: PuntoMapa[] = [];
+    if (trazadoNormal.length > 0) {
+      resultado.push({
+        id: "inicio",
+        ...trazadoNormal[0],
+        titulo: "Inicio",
+        color: colorLinea,
+        tipo: "parada",
+      });
+    }
+    if (trazadoNormal.length > 1) {
+      resultado.push({
+        id: "destino",
+        ...trazadoNormal[trazadoNormal.length - 1],
+        titulo: "Destino",
+        color: colorLinea,
+        tipo: "parada",
+      });
+    }
+    return resultado;
+  }, [trazadoNormal, colorLinea]);
 
-  const regionInicial = {
-    latitude: -31.7345,
-    longitude: -60.523,
-    latitudeDelta: 0.02,
-    longitudeDelta: 0.02,
-  };
+  // Centra el mapa en el punto medio del recorrido
+  const centro = useMemo<Coordenadas>(() => {
+    if (trazadoNormal.length === 0) return CENTRO_DEFAULT;
+    const lat = trazadoNormal.reduce((s, c) => s + c.latitud, 0) / trazadoNormal.length;
+    const lon = trazadoNormal.reduce((s, c) => s + c.longitud, 0) / trazadoNormal.length;
+    return { latitud: lat, longitud: lon };
+  }, [trazadoNormal]);
+
+  const leyenda = (
+    <Text style={[styles.leyenda, { color: paleta.textoMedio }]}>
+      {trazadoAlternativo ? "Trazado alternativo punteado · " : ""}
+      {totalParadas} paradas en este sentido
+    </Text>
+  );
 
   if (Platform.OS === "web") {
     return (
@@ -71,10 +79,7 @@ export const MapaRecorrido: React.FC<MapaRecorridoProps> = ({
             Mapa del recorrido de la línea
           </Text>
         </View>
-        <Text style={[styles.leyenda, { color: paleta.textoMedio }]}>
-          {trazadoAlternativo ? "Trazado alternativo punteado · " : ""}
-          {totalParadas} paradas en este sentido
-        </Text>
+        {leyenda}
       </View>
     );
   }
@@ -82,67 +87,15 @@ export const MapaRecorrido: React.FC<MapaRecorridoProps> = ({
   return (
     <View style={styles.container}>
       <View style={[styles.mapWrapper, { borderColor: paleta.borde }]}>
-      <MapView
-          provider={PROVIDER_DEFAULT}
-          style={styles.map}
-          initialRegion={regionInicial}
-          customMapStyle={temaActual === "dark" ? DARK_MAP_STYLE : []}
-          showsCompass={false}
-          showsBuildings={false}
-        >
-          <UrlTile
-            urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-            maximumZ={19}
-            flipY={false}
-            zIndex={-1}
-          />
-
-          {/* Trazado normal de la línea */}
-          {coordsNormales.length > 1 ? (
-            <Polyline
-              coordinates={coordsNormales}
-              strokeColor={colorLinea}
-              strokeWidth={4}
-            />
-          ) : null}
-
-          {/* Trazado alternativo por desvío (línea punteada ámbar) */}
-          {coordsAlternativas.length > 1 ? (
-            <Polyline
-              coordinates={coordsAlternativas}
-              strokeColor="#f5a524"
-              strokeWidth={4}
-              lineDashPattern={[6, 6]}
-            />
-          ) : null}
-
-          {/* Marcadores de inicio y fin */}
-          {coordsNormales.length > 0 ? (
-            <Marker
-              coordinate={coordsNormales[0]}
-              title="Inicio"
-              anchor={{ x: 0.5, y: 0.5 }}
-            >
-              <View collapsable={false} style={[styles.pin, { backgroundColor: colorLinea }]} />
-            </Marker>
-          ) : null}
-          {coordsNormales.length > 1 ? (
-            <Marker
-              coordinate={coordsNormales[coordsNormales.length - 1]}
-              title="Destino"
-              anchor={{ x: 0.5, y: 0.5 }}
-            >
-              <View collapsable={false} style={[styles.pin, { backgroundColor: colorLinea }]} />
-            </Marker>
-          ) : null}
-        </MapView>
+        <MapaLeaflet
+          centro={centro}
+          zoom={14}
+          puntos={puntos}
+          lineas={lineas}
+          oscuro={temaActual === "dark"}
+        />
       </View>
-
-      {/* Leyenda debajo del mapa */}
-      <Text style={[styles.leyenda, { color: paleta.textoMedio }]}>
-        {trazadoAlternativo ? "Trazado alternativo punteado · " : ""}
-        {totalParadas} paradas en este sentido
-      </Text>
+      {leyenda}
     </View>
   );
 };
@@ -158,9 +111,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
   },
-  map: {
-    ...StyleSheet.absoluteFill,
-  },
   mapWebFallback: {
     height: 190,
     borderRadius: 16,
@@ -174,12 +124,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     marginTop: 10,
-  },
-  pin: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: "#ffffff",
   },
 });
