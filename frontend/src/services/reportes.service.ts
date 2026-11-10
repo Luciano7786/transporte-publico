@@ -57,6 +57,7 @@ export const crearReporte = async (nuevo: {
 }): Promise<RespuestaExitosa<ReporteDeDemora>> => {
   const reporteId = nuevo.id ?? `rep-off-${Date.now()}`;
   const fechaHora = new Date().toISOString();
+  const fotoUri = nuevo.fotoUri?.startsWith("http") ? nuevo.fotoUri : null;
 
   const payload: Record<string, any> = {
     lineaId: nuevo.lineaId,
@@ -67,9 +68,7 @@ export const crearReporte = async (nuevo: {
 
   if (nuevo.id) payload.id = nuevo.id;
   if (nuevo.comentario?.trim()) payload.comentario = nuevo.comentario.trim();
-  if (nuevo.fotoUri && nuevo.fotoUri.startsWith("http")) {
-    payload.fotoUri = nuevo.fotoUri;
-  }
+  if (fotoUri) payload.fotoUri = fotoUri;
 
   try {
     const res = await clienteHttp<ReporteDeDemora>("/reportes-demora", {
@@ -86,6 +85,7 @@ export const crearReporte = async (nuevo: {
         paradaId: nuevo.paradaId,
         motivo: nuevo.motivo,
         comentario: nuevo.comentario ?? null,
+        fotoUri,
         fechaHora,
       });
 
@@ -97,7 +97,7 @@ export const crearReporte = async (nuevo: {
           usuarioId: "yo",
           motivo: nuevo.motivo,
           comentario: nuevo.comentario ?? null,
-          fotoUri: nuevo.fotoUri ?? null,
+          fotoUri,
           confirmaciones: 0,
           fechaHora,
           sincronizado: false,
@@ -131,6 +131,7 @@ export async function sincronizarReportesOffline(): Promise<{
           paradaId: rep.paradaId,
           motivo: rep.motivo,
           comentario: rep.comentario,
+          ...(rep.fotoUri ? { fotoUri: rep.fotoUri } : {}),
           fechaHora: rep.fechaHora,
         }),
       });

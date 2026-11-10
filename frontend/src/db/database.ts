@@ -17,6 +17,7 @@ export interface ReporteOfflineLocal {
   paradaId: string;
   motivo: MotivoDemora;
   comentario: string | null;
+  fotoUri: string | null;
   fechaHora: string;
   sincronizado: number; // 0 = pendiente, 1 = enviado
 }
@@ -81,6 +82,7 @@ async function inicializarTablas(db: SQLite.SQLiteDatabase): Promise<void> {
       paradaId TEXT NOT NULL,
       motivo TEXT NOT NULL,
       comentario TEXT,
+      fotoUri TEXT,
       fechaHora TEXT NOT NULL,
       sincronizado INTEGER DEFAULT 0
     );
@@ -93,6 +95,13 @@ async function inicializarTablas(db: SQLite.SQLiteDatabase): Promise<void> {
       PRIMARY KEY (paradaId, lineaId, sentido)
     );
   `);
+
+  const columnasCola = await db.getAllAsync<{ name: string }>(
+    "PRAGMA table_info(cola_reportes_offline);",
+  );
+  if (!columnasCola.some((columna) => columna.name === "fotoUri")) {
+    await db.execAsync("ALTER TABLE cola_reportes_offline ADD COLUMN fotoUri TEXT;");
+  }
 
   // 2. Poblado inicial con datos semilla si la base está recién creada
   try {
@@ -391,20 +400,22 @@ export async function encolarReporteOffline(reporte: {
   paradaId: string;
   motivo: MotivoDemora;
   comentario?: string | null;
+  fotoUri?: string | null;
   fechaHora: string;
 }): Promise<void> {
   const db = await obtenerBaseDeDatos();
   if (!db) return;
 
   await db.runAsync(
-    `INSERT OR REPLACE INTO cola_reportes_offline (id, lineaId, paradaId, motivo, comentario, fechaHora, sincronizado)
-     VALUES (?, ?, ?, ?, ?, ?, 0);`,
+    `INSERT OR REPLACE INTO cola_reportes_offline (id, lineaId, paradaId, motivo, comentario, fotoUri, fechaHora, sincronizado)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0);`,
     [
       reporte.id,
       reporte.lineaId,
       reporte.paradaId,
       reporte.motivo,
       reporte.comentario ?? null,
+      reporte.fotoUri ?? null,
       reporte.fechaHora,
     ],
   );
@@ -444,4 +455,3 @@ export async function limpiarReportesSincronizados(): Promise<void> {
 
   await db.runAsync("DELETE FROM cola_reportes_offline WHERE sincronizado = 1;");
 }
-

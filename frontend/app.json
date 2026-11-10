@@ -22,7 +22,15 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Permite acceder a la cámara para escanear el código QR de las paradas."
+          "cameraPermission": "Permite usar la cámara para escanear códigos QR y tomar fotos para reportes."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Permite tomar fotos para adjuntarlas a un reporte.",
+          "photosPermission": "Permite seleccionar fotos de la galería para adjuntarlas a un reporte.",
+          "microphonePermission": false
         }
       ],
       [

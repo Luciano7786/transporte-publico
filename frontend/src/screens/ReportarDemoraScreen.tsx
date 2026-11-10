@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useState } from "react";
+import * as ImagePicker from "expo-image-picker";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -13,8 +14,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useThemeContext } from "../hooks/use-theme-context";
+import { apiService } from "../services/api";
+import { obtenerLineas } from "../services/lineas.service";
+import { obtenerParadaPorId } from "../services/paradas.service";
 import { crearReporte } from "../services/reportes.service";
-import type { MotivoDemora } from "../types";
+import type { Linea, MotivoDemora } from "../types";
 
 export function ReportarDemoraScreen() {
   const navigation = useNavigation<any>();
@@ -23,14 +27,81 @@ export function ReportarDemoraScreen() {
 
   const paradaId = route.params?.paradaId ?? "par-101";
   const nombreParada = route.params?.nombreParada ?? "Alameda y Urquiza";
+  const idsLineaIniciales: string[] = Array.isArray(route.params?.lineaIds)
+    ? route.params.lineaIds
+    : [];
 
   // Estados del formulario
-  const [lineaSeleccionada, setLineaSeleccionada] = useState<string>("lin-05");
+  const [lineaIds, setLineaIds] = useState<string[]>(idsLineaIniciales);
+  const [lineas, setLineas] = useState<Linea[]>([]);
+  const [cargandoLineas, setCargandoLineas] = useState(true);
+  const [errorLineas, setErrorLineas] = useState<string | null>(null);
+  const [lineaSeleccionada, setLineaSeleccionada] = useState<string>(
+    idsLineaIniciales[0] ?? "",
+  );
   const [motivoSeleccionado, setMotivoSeleccionado] =
     useState<MotivoDemora>("no_paso");
   const [comentario, setComentario] = useState<string>("");
-  const [fotoUri, setFotoUri] = useState<string | null>(null);
+  const [fotoSeleccionada, setFotoSeleccionada] =
+    useState<ImagePicker.ImagePickerAsset | null>(null);
   const [enviando, setEnviando] = useState<boolean>(false);
+
+  useEffect(() => {
+    let activo = true;
+
+    async function cargarLineasDeParada() {
+      setCargandoLineas(true);
+      setErrorLineas(null);
+      const [resultadoParada, resultadoLineas] = await Promise.allSettled([
+        obtenerParadaPorId(paradaId),
+        obtenerLineas(),
+      ]);
+
+      if (!activo) return;
+
+      const problemas: string[] = [];
+      if (resultadoParada.status === "fulfilled") {
+        setLineaIds(resultadoParada.value.datos.lineaIds);
+      } else {
+        console.warn("No se pudieron cargar las líneas de la parada:", resultadoParada.reason);
+        problemas.push("No se pudo actualizar la información de la parada.");
+      }
+
+      if (resultadoLineas.status === "fulfilled") {
+        setLineas(resultadoLineas.value.datos);
+      } else {
+        console.warn("No se pudo cargar el catálogo de líneas:", resultadoLineas.reason);
+        problemas.push(
+          resultadoLineas.reason instanceof Error
+            ? resultadoLineas.reason.message
+            : "No se pudo cargar el catálogo de líneas.",
+        );
+      }
+
+      setErrorLineas(problemas.length > 0 ? problemas.join(" ") : null);
+      setCargandoLineas(false);
+    }
+
+    cargarLineasDeParada();
+    return () => {
+      activo = false;
+    };
+  }, [paradaId]);
+
+  useEffect(() => {
+    if (!lineaIds.includes(lineaSeleccionada)) {
+      setLineaSeleccionada(lineaIds[0] ?? "");
+    }
+  }, [lineaIds, lineaSeleccionada]);
+
+  const lineasDisponibles = lineaIds.map((id) => {
+    const linea = lineas.find((item) => item.id === id);
+    return {
+      id,
+      numero: linea?.numero ?? id.replace(/^lin-0?/, ""),
+      color: linea?.color ?? paleta.acento,
+    };
+  });
 
   const opcionesMotivo: Array<{ id: MotivoDemora; label: string }> = [
     { id: "no_paso", label: "No pasó" },
@@ -40,20 +111,64 @@ export function ReportarDemoraScreen() {
     { id: "calle_cortada", label: "Calle cortada" },
   ];
 
-  const handleSacarFoto = () => {
-    // Foto de demostración para emuladores y dispositivos
-    setFotoUri("https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=400");
-    Alert.alert("Cámara", "Foto adjuntada al reporte.");
-  };
+  const seleccionarFoto = async (origen: "camara" | "galeria") => {
+    try {
+      if (origen === "camara") {
+        const permiso = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permiso.granted) {
+          Alert.alert(
+            "Permiso requerido",
+            "Habilitá el acceso a la cámara para tomar una foto.",
+          );
+          return;
+        }
+      }
 
-  const handleGaleria = () => {
-    setFotoUri("https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=400");
-    Alert.alert("Galería", "Imagen seleccionada.");
+      const resultado =
+        origen === "camara"
+          ? await ImagePicker.launchCameraAsync({
+              mediaTypes: ["images"],
+              allowsEditing: true,
+              quality: 0.8,
+            })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ["images"],
+              allowsEditing: true,
+              quality: 0.8,
+            });
+
+      if (!resultado.canceled && resultado.assets[0]) {
+        setFotoSeleccionada(resultado.assets[0]);
+      }
+    } catch (error) {
+      console.warn("No se pudo abrir la cámara o galería:", error);
+      Alert.alert(
+        "No se pudo seleccionar la foto",
+        error instanceof Error
+          ? error.message
+          : "Volvé a intentarlo desde la cámara o galería.",
+      );
+    }
   };
 
   const handleEnviarReporte = async () => {
+    if (!lineaIds.includes(lineaSeleccionada)) {
+      Alert.alert("Seleccioná una línea", "Elegí una de las líneas de esta parada.");
+      return;
+    }
+
     try {
       setEnviando(true);
+      let fotoUri: string | null = null;
+      if (fotoSeleccionada) {
+        const archivo = await apiService.subirArchivo({
+          uri: fotoSeleccionada.uri,
+          name: fotoSeleccionada.fileName ?? `reporte-${Date.now()}.jpg`,
+          type: fotoSeleccionada.mimeType ?? "image/jpeg",
+        });
+        fotoUri = archivo.url;
+      }
+
       const res = await crearReporte({
         lineaId: lineaSeleccionada,
         paradaId,
@@ -76,10 +191,14 @@ export function ReportarDemoraScreen() {
           },
         ],
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       Alert.alert(
         "No se pudo enviar",
-        err?.message || "Ocurrió un error al enviar el reporte. Verificá que hayas iniciado sesión.",
+        `${err instanceof Error ? err.message : "Ocurrió un error inesperado."}${
+          fotoSeleccionada
+            ? "\n\nLa foto sigue adjunta. Verificá la conexión o quitá la foto para guardar el reporte sin conexión."
+            : ""
+        }`,
       );
     } finally {
       setEnviando(false);
@@ -122,66 +241,55 @@ export function ReportarDemoraScreen() {
         </Text>
 
         <View style={styles.lineasSelectorRow}>
-          {/* Línea 5 */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setLineaSeleccionada("lin-05")}
-            style={[
-              styles.lineaBadge,
-              lineaSeleccionada === "lin-05"
-                ? { backgroundColor: "#1B6CA8" }
-                : {
-                    backgroundColor: paleta.superficie1,
-                    borderColor: paleta.borde,
-                    borderWidth: 1,
-                  },
-            ]}
-          >
-            <Text
-              style={[
-                styles.lineaNumero,
-                {
-                  color:
-                    lineaSeleccionada === "lin-05"
-                      ? "#ffffff"
-                      : paleta.textoBajo,
-                },
-              ]}
-            >
-              5
-            </Text>
-          </TouchableOpacity>
-
-          {/* Línea 14 */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setLineaSeleccionada("lin-14")}
-            style={[
-              styles.lineaBadge,
-              lineaSeleccionada === "lin-14"
-                ? { backgroundColor: "#B45309" }
-                : {
-                    backgroundColor: paleta.superficie1,
-                    borderColor: paleta.borde,
-                    borderWidth: 1,
-                  },
-            ]}
-          >
-            <Text
-              style={[
-                styles.lineaNumero,
-                {
-                  color:
-                    lineaSeleccionada === "lin-14"
-                      ? "#ffffff"
-                      : paleta.textoBajo,
-                },
-              ]}
-            >
-              14
-            </Text>
-          </TouchableOpacity>
+          {lineasDisponibles.map((linea) => {
+            const seleccionada = lineaSeleccionada === linea.id;
+            return (
+              <TouchableOpacity
+                key={linea.id}
+                activeOpacity={0.8}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: seleccionada }}
+                onPress={() => setLineaSeleccionada(linea.id)}
+                style={[
+                  styles.lineaBadge,
+                  seleccionada
+                    ? { backgroundColor: linea.color }
+                    : {
+                        backgroundColor: paleta.superficie1,
+                        borderColor: paleta.borde,
+                        borderWidth: 1,
+                      },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.lineaNumero,
+                    {
+                      color: seleccionada ? "#ffffff" : paleta.textoBajo,
+                    },
+                  ]}
+                >
+                  {linea.numero}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
+        {cargandoLineas && (
+          <Text style={[styles.avisoLineas, { color: paleta.textoMedio }]}>
+            Cargando líneas de la parada…
+          </Text>
+        )}
+        {!cargandoLineas && lineasDisponibles.length === 0 && (
+          <Text style={[styles.avisoLineas, { color: paleta.textoMedio }]}>
+            Esta parada no tiene líneas disponibles para reportar.
+          </Text>
+        )}
+        {errorLineas && (
+          <Text style={[styles.avisoLineas, { color: paleta.textoMedio }]}>
+            {errorLineas}
+          </Text>
+        )}
 
         {/* 3. Lista de Motivos con Radio Buttons */}
         <View style={styles.motivosContainer}>
@@ -258,7 +366,8 @@ export function ReportarDemoraScreen() {
         <View style={styles.fotoBotonesRow}>
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={handleSacarFoto}
+            onPress={() => seleccionarFoto("camara")}
+            disabled={enviando}
             style={[
               styles.fotoBoton,
               {
@@ -274,7 +383,8 @@ export function ReportarDemoraScreen() {
 
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={handleGaleria}
+            onPress={() => seleccionarFoto("galeria")}
+            disabled={enviando}
             style={[
               styles.fotoBoton,
               {
@@ -290,11 +400,15 @@ export function ReportarDemoraScreen() {
         </View>
 
         {/* Vista previa de foto adjunta si existe */}
-        {fotoUri && (
+        {fotoSeleccionada && (
           <View style={styles.fotoPreviewContainer}>
-            <Image source={{ uri: fotoUri }} style={styles.fotoThumbnail} />
+            <Image
+              source={{ uri: fotoSeleccionada.uri }}
+              style={styles.fotoThumbnail}
+            />
             <TouchableOpacity
-              onPress={() => setFotoUri(null)}
+              onPress={() => setFotoSeleccionada(null)}
+              disabled={enviando}
               style={styles.eliminarFotoBtn}
             >
               <Ionicons name="close" size={16} color="#ffffff" />
@@ -319,10 +433,18 @@ export function ReportarDemoraScreen() {
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={handleEnviarReporte}
-          disabled={enviando}
+          disabled={
+            enviando || cargandoLineas || !lineasDisponibles.length
+          }
           style={[
             styles.botonEnviar,
-            { backgroundColor: paleta.acento, opacity: enviando ? 0.6 : 1 },
+            {
+              backgroundColor: paleta.acento,
+              opacity:
+                enviando || cargandoLineas || !lineasDisponibles.length
+                  ? 0.6
+                  : 1,
+            },
           ]}
         >
           <Text
@@ -381,15 +503,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   lineaBadge: {
-    width: 44,
+    minWidth: 44,
     height: 36,
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 10,
   },
   lineaNumero: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  avisoLineas: {
+    fontSize: 13,
+    marginBottom: 14,
   },
   motivosContainer: {
     gap: 10,

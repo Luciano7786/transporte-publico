@@ -11,6 +11,8 @@
     "axios": "^1.21.0",
     "expo": "~57.0.31",
     "expo-camera": "~57.0.6",
+    "expo-haptics": "~57.0.3",
+    "expo-image-picker": "~57.0.21",
     "expo-local-authentication": "~57.0.3",
     "expo-location": "~57.0.22",
     "expo-network": "~57.0.3",

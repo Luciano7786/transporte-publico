@@ -1,4 +1,5 @@
 import { useNavigation, useRoute } from "@react-navigation/native";
+import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -111,12 +112,21 @@ export function ParadaDetalleScreen() {
         prev.map((r) => (r.id === reporteId ? res.datos : r)),
       );
       setReportesConfirmados((prev) => [...prev, reporteId]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        (error: unknown) =>
+          console.warn("No se pudo reproducir la confirmación háptica:", error),
+      );
       Alert.alert(
         "Confirmación registrada",
         "¡Gracias! Tu confirmación ayuda a los demás pasajeros que están esperando.",
       );
-    } catch (err: any) {
-      Alert.alert("Aviso", err?.message || "No se pudo registrar la confirmación.");
+    } catch (err: unknown) {
+      Alert.alert(
+        "Aviso",
+        err instanceof Error
+          ? err.message
+          : "No se pudo registrar la confirmación.",
+      );
     }
   };
 
@@ -124,6 +134,7 @@ export function ParadaDetalleScreen() {
     navigation.navigate("ReportarDemora", {
       paradaId: parada.id,
       nombreParada: parada.nombre,
+      lineaIds: parada.lineaIds,
     });
   };
 
