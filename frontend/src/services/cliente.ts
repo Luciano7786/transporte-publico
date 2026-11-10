@@ -6,7 +6,7 @@ import type { RespuestaExitosa } from "../types";
 import { ErrorApi } from "./error.service";
 
 const CLAVE_TOKEN = "sesion.token";
-const TIEMPO_MAXIMO_MS = 15000;
+const TIEMPO_MAXIMO_MS = 4000;
 
 export interface OpcionesPeticion extends RequestInit {
   autenticado?: boolean;

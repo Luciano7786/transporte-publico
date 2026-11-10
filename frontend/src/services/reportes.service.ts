@@ -7,6 +7,7 @@ import {
   marcarReporteSincronizado,
   obtenerReportesPendientes,
 } from "../db/database";
+import { REPORTES_MOCK } from "../mocks/reportes.mock";
 import type { MotivoDemora, ReporteDeDemora, RespuestaExitosa } from "../types";
 import { clienteHttp } from "./cliente";
 import { ErrorApi } from "./error.service";
@@ -114,26 +115,95 @@ function esErrorDeConexion(error: unknown): boolean {
 
 /**
  * Obtiene los reportes de demora recientes (últimos 90 minutos) de una parada.
+ * Si el backend no está disponible, combina los reportes pendientes guardados en SQLite
+ * con los reportes semilla de la parada para que el APK funcione sin servidor.
  */
-export const obtenerReportesPorParada = (
+export const obtenerReportesPorParada = async (
   paradaId: string,
-): Promise<RespuestaExitosa<ReporteDeDemora[]>> =>
-  clienteHttp<ReporteDeDemora[]>(
-    `/reportes-demora?paradaId=${encodeURIComponent(paradaId)}`,
-  );
+): Promise<RespuestaExitosa<ReporteDeDemora[]>> => {
+  try {
+    return await clienteHttp<ReporteDeDemora[]>(
+      `/reportes-demora?paradaId=${encodeURIComponent(paradaId)}`,
+    );
+  } catch (error) {
+    if (esErrorDeConexion(error)) {
+      const pendientes = await obtenerReportesPendientes();
+      const localesParada: ReporteDeDemora[] = pendientes
+        .filter((r) => r.paradaId === paradaId)
+        .map((r) => ({
+          id: r.id,
+          lineaId: r.lineaId,
+          paradaId: r.paradaId,
+          usuarioId: "yo",
+          motivo: r.motivo,
+          comentario: r.comentario,
+          fotoUri: r.fotoUri ?? null,
+          confirmaciones: 1,
+          fechaHora: r.fechaHora,
+          sincronizado: false,
+        }));
+
+      const mocksParada = REPORTES_MOCK.filter((r) => r.paradaId === paradaId);
+      const combinados = [...localesParada, ...mocksParada];
+
+      return {
+        datos: combinados,
+        meta: {
+          total: combinados.length,
+          pagina: 1,
+          porPagina: Math.max(1, combinados.length),
+        },
+      };
+    }
+    throw error;
+  }
+};
 
 /**
  * Confirma un reporte de demora existente.
+ * Si el backend no está disponible, actualiza el contador localmente.
  */
-export const confirmarReporte = (
+export const confirmarReporte = async (
   reporteId: string,
-): Promise<RespuestaExitosa<ReporteDeDemora>> =>
-  clienteHttp<ReporteDeDemora>(
-    `/reportes-demora/${encodeURIComponent(reporteId)}/confirmaciones`,
-    {
-      method: "POST",
-    },
-  );
+): Promise<RespuestaExitosa<ReporteDeDemora>> => {
+  try {
+    return await clienteHttp<ReporteDeDemora>(
+      `/reportes-demora/${encodeURIComponent(reporteId)}/confirmaciones`,
+      {
+        method: "POST",
+      },
+    );
+  } catch (error) {
+    if (esErrorDeConexion(error)) {
+      const enMock = REPORTES_MOCK.find((r) => r.id === reporteId);
+      if (enMock) {
+        enMock.confirmaciones += 1;
+        return { datos: { ...enMock }, meta: null };
+      }
+
+      const pendientes = await obtenerReportesPendientes();
+      const local = pendientes.find((r) => r.id === reporteId);
+      if (local) {
+        return {
+          datos: {
+            id: local.id,
+            lineaId: local.lineaId,
+            paradaId: local.paradaId,
+            usuarioId: "yo",
+            motivo: local.motivo,
+            comentario: local.comentario,
+            fotoUri: local.fotoUri ?? null,
+            confirmaciones: 2,
+            fechaHora: local.fechaHora,
+            sincronizado: false,
+          },
+          meta: null,
+        };
+      }
+    }
+    throw error;
+  }
+};
 
 /**
  * Crea un nuevo reporte de demora.

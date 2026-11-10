@@ -1,6 +1,6 @@
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
-import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -111,6 +111,23 @@ export function ParadaDetalleScreen() {
       Object.values(timersRecordatorioRef.current).forEach(clearTimeout);
     };
   }, [paradaId]);
+
+  // Refresca los reportes al regresar de la pantalla "Reportar una demora"
+  useFocusEffect(
+    useCallback(() => {
+      let activo = true;
+      obtenerReportesPorParada(paradaId)
+        .then((res) => {
+          if (activo && res.datos) {
+            setReportes(res.datos);
+          }
+        })
+        .catch(() => {});
+      return () => {
+        activo = false;
+      };
+    }, [paradaId]),
+  );
 
   const handleConfirmarDemora = async (reporteId: string) => {
     try {
