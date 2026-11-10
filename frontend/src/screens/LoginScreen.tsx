@@ -1,5 +1,5 @@
 import React, { useState, useContext } from "react";
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from "react-native";
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -20,7 +20,7 @@ export default function LoginScreen() {
             await auth?.iniciarSesion(email, password);
             navigation.replace('MainTabs');
         } catch (error) {
-            alert("Error al iniciar sesión. Verifique sus credenciales.");
+            Alert.alert("Error de inicio de sesión", "Verifique sus credenciales e intente de nuevo.");
         }
     };
 

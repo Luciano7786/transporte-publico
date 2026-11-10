@@ -128,7 +128,13 @@ export function EscanerQrScreen() {
 
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate("MainTabs");
+            }
+          }}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={[styles.textoBoton, { color: paleta.textoMedio }]}>
@@ -156,7 +162,13 @@ export function EscanerQrScreen() {
         <View style={styles.barraSuperior}>
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate("MainTabs");
+              }
+            }}
             style={styles.botonRedondo}
             accessibilityRole="button"
             accessibilityLabel="Cerrar el escáner"

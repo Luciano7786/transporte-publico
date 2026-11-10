@@ -150,7 +150,13 @@ export function ParadaDetalleScreen() {
       <ParadaHeader
         nombre={parada.nombre}
         esFavorita={esFavorita}
-        onPressVolver={() => navigation.goBack()}
+        onPressVolver={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          } else {
+            navigation.navigate("MainTabs");
+          }
+        }}
         onToggleFavorita={() => setEsFavorita((prev) => !prev)}
       />
 
