@@ -121,7 +121,9 @@ export function ParadaDetalleScreen() {
             setReportes(res.datos);
           }
         })
-        .catch(() => {});
+        .catch((error: unknown) =>
+          console.warn("No se pudieron actualizar los reportes de la parada:", error),
+        );
       return () => {
         activo = false;
       };
