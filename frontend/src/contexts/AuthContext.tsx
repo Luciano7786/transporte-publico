@@ -13,6 +13,7 @@ import Storage from "expo-sqlite/kv-store";
 import type { Tema, Usuario } from "../types";
 import {
   actualizarPerfilServicio,
+  actualizarUsuarioEnCuentasLocales,
   agregarLineaFavoritaServicio,
   agregarParadaFavoritaServicio,
   eliminarLineaFavoritaServicio,
@@ -25,8 +26,8 @@ import { registrarDispositivoPushEnServidor } from "../services/notificaciones.s
 
 const CLAVE_TOKEN = "sesion.token";
 const CLAVE_USUARIO = "sesion.usuario";
-const CLAVE_LINEAS_FAV_LOCAL = "favoritos.lineas";
-const CLAVE_PARADAS_FAV_LOCAL = "favoritos.paradas";
+const CLAVE_LINEAS_FAV_LOCAL = "favoritos.lineas.v2";
+const CLAVE_PARADAS_FAV_LOCAL = "favoritos.paradas.v2";
 const CLAVE_BIOMETRIA = "seguridad.biometria";
 
 export interface AuthContextValue {
@@ -87,13 +88,8 @@ async function borrarSesionGuardada() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [restaurando, setRestaurando] = useState(true);
-  const [lineasFavLocales, setLineasFavLocales] = useState<string[]>([
-    "lin-05",
-    "lin-14",
-  ]);
-  const [paradasFavLocales, setParadasFavLocales] = useState<string[]>([
-    "par-101",
-  ]);
+  const [lineasFavLocales, setLineasFavLocales] = useState<string[]>([]);
+  const [paradasFavLocales, setParadasFavLocales] = useState<string[]>([]);
   const [biometriaHabilitada, setBiometriaHabilitadaState] =
     useState<boolean>(false);
   const [biometriaDisponible, setBiometriaDisponible] =
@@ -121,8 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ]);
 
         if (!cancelado) {
-          setLineasFavLocales(leerListaGuardada(favLineasRaw, ["lin-05", "lin-14"]));
-          setParadasFavLocales(leerListaGuardada(favParadasRaw, ["par-101"]));
+          setLineasFavLocales(leerListaGuardada(favLineasRaw, []));
+          setParadasFavLocales(leerListaGuardada(favParadasRaw, []));
           setBiometriaHabilitadaState(bioRaw === "true");
         }
 
@@ -242,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           CLAVE_USUARIO,
           JSON.stringify(usuarioActualizado),
         ).catch(() => {});
+        await actualizarUsuarioEnCuentasLocales(usuarioActualizado);
 
         try {
           if (yaEsFavorita) {
@@ -254,6 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 CLAVE_USUARIO,
                 JSON.stringify(res.datos),
               ).catch(() => {});
+              await actualizarUsuarioEnCuentasLocales(res.datos);
             }
           }
         } catch {
@@ -286,6 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           CLAVE_USUARIO,
           JSON.stringify(usuarioActualizado),
         ).catch(() => {});
+        await actualizarUsuarioEnCuentasLocales(usuarioActualizado);
 
         try {
           if (yaEsFavorita) {
@@ -298,6 +297,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 CLAVE_USUARIO,
                 JSON.stringify(res.datos),
               ).catch(() => {});
+              await actualizarUsuarioEnCuentasLocales(res.datos);
             }
           }
         } catch {
@@ -329,6 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await Storage.setItem(CLAVE_USUARIO, JSON.stringify(actualizado)).catch(
         () => {},
       );
+      await actualizarUsuarioEnCuentasLocales(actualizado);
 
       try {
         const res = await actualizarPerfilServicio(cambios);
@@ -338,6 +339,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             CLAVE_USUARIO,
             JSON.stringify(res.datos),
           ).catch(() => {});
+          await actualizarUsuarioEnCuentasLocales(res.datos);
         }
       } catch {
       }

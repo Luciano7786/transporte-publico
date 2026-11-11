@@ -78,6 +78,7 @@ export function LinesScreen() {
 
   return (
     <SafeAreaView
+      edges={["top", "left", "right"]}
       style={[styles.safeArea, { backgroundColor: paleta.fondoApp }]}
     >
       <View style={styles.header}>

@@ -121,6 +121,7 @@ export function PerfilScreen() {
 
   return (
     <SafeAreaView
+      edges={["top", "left", "right"]}
       style={[styles.safeArea, { backgroundColor: paleta.fondoApp }]}
     >
       <View style={styles.header}>

@@ -6,6 +6,8 @@ import type { Aviso } from "../types";
 import { clienteHttp } from "./cliente";
 
 const CLAVE_AVISOS_NOTIFICADOS = "notificaciones.avisos_vistos_ids";
+const CANAL_RECORDATORIOS_ID = "recordatorios-colectivo-parana";
+const CANAL_AVISOS_ID = "avisos-transporte-parana";
 
 LogBox.ignoreLogs([
   "expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go",
@@ -19,19 +21,61 @@ try {
       shouldShowBanner: true,
       shouldShowList: true,
       shouldPlaySound: true,
-      shouldSetBadge: false,
+      shouldSetBadge: true,
+      priority: Notifications.AndroidNotificationPriority.MAX,
     }),
   });
 } catch {
 }
 
+export async function asegurarCanalesNotificacionAndroid(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  try {
+    await Notifications.setNotificationChannelAsync(CANAL_RECORDATORIOS_ID, {
+      name: "Recordatorios de llegada de colectivo",
+      description: "Alertas 10 minutos antes de que pase tu colectivo por la parada",
+      importance: Notifications.AndroidImportance.MAX,
+      bypassDnd: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      sound: "default",
+      enableVibrate: true,
+      vibrationPattern: [0, 300, 150, 300],
+      enableLights: true,
+      lightColor: "#0284C7",
+      showBadge: true,
+    });
+
+    await Notifications.setNotificationChannelAsync(CANAL_AVISOS_ID, {
+      name: "Avisos y desvíos de líneas favoritas",
+      description: "Alertas de desvíos o interrupciones en tus líneas favoritas",
+      importance: Notifications.AndroidImportance.HIGH,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      sound: "default",
+      enableVibrate: true,
+      vibrationPattern: [0, 250, 150, 250],
+      enableLights: true,
+      lightColor: "#D97706",
+      showBadge: true,
+    });
+  } catch {
+  }
+}
+
 export async function solicitarPermisoNotificaciones(): Promise<boolean> {
   if (Platform.OS === "web") return false;
   try {
+    await asegurarCanalesNotificacionAndroid();
+
     const actual = await Notifications.getPermissionsAsync();
     if (actual.status === "granted") return true;
 
-    const solicitado = await Notifications.requestPermissionsAsync();
+    const solicitado = await Notifications.requestPermissionsAsync({
+      ios: {
+        allowAlert: true,
+        allowBadge: true,
+        allowSound: true,
+      },
+    });
     return solicitado.status === "granted";
   } catch {
     return false;
@@ -43,6 +87,7 @@ export async function programarRecordatorioColectivo(params: {
   horaColectivo: string;
   nombreParada: string;
   segundosParaDisparo: number;
+  fechaDisparo?: Date;
 }): Promise<string | null> {
   if (Platform.OS === "web") return null;
 
@@ -50,21 +95,33 @@ export async function programarRecordatorioColectivo(params: {
     const tienePermiso = await solicitarPermisoNotificaciones();
     if (!tienePermiso) return null;
 
+    const segundos = Math.max(1, Math.round(params.segundosParaDisparo));
+    const fechaObjetivo =
+      params.fechaDisparo && params.fechaDisparo.getTime() > Date.now() + 1000
+        ? params.fechaDisparo
+        : new Date(Date.now() + segundos * 1000);
+
     const idNotificacion = await Notifications.scheduleNotificationAsync({
       content: {
         title: `🚌 Línea ${params.numeroLinea} en 10 minutos`,
         body: `El colectivo de las ${params.horaColectivo} está próximo a pasar por ${params.nombreParada} (según tabla).`,
-        sound: true,
+        sound: "default",
+        vibrate: [0, 300, 150, 300],
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        color: "#0D254C",
+        autoDismiss: true,
+        interruptionLevel: "timeSensitive",
         data: {
           tipo: "recordatorio_horario",
           numeroLinea: params.numeroLinea,
           hora: params.horaColectivo,
+          nombreParada: params.nombreParada,
         },
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: Math.max(1, Math.round(params.segundosParaDisparo)),
-        repeats: false,
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: fechaObjetivo,
+        channelId: CANAL_RECORDATORIOS_ID,
       },
     });
 
@@ -154,14 +211,19 @@ export async function notificarNuevosAvisosEnLineasFavoritas(
         content: {
           title: `⚠️ Aviso en tu línea favorita (${lineasTexto})`,
           body: `${aviso.titulo}: ${aviso.detalle}`,
-          sound: true,
+          sound: "default",
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          color: "#D97706",
           data: {
             tipo: "aviso_linea_favorita",
             avisoId: aviso.id,
             lineaIds: aviso.lineaIds,
           },
         },
-        trigger: null,
+        trigger:
+          Platform.OS === "android"
+            ? { channelId: CANAL_AVISOS_ID }
+            : null,
       });
 
       idsYaNotificados.push(aviso.id);

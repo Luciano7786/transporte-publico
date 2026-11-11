@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import React from "react";
-import { Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemeContext } from "../hooks/use-theme-context";
 import { AvisosScreen } from "../screens/AvisosScreen";
 import { LinesScreen } from "../screens/LineasScreen";
@@ -12,6 +12,8 @@ const Tab = createBottomTabNavigator();
 
 export function TabNavigator() {
   const { paleta } = useThemeContext();
+  const insets = useSafeAreaInsets();
+  const paddingInferior = Math.max(insets.bottom, 10);
 
   return (
     <Tab.Navigator
@@ -24,9 +26,9 @@ export function TabNavigator() {
           backgroundColor: paleta.superficie1,
           borderTopColor: paleta.borde,
           borderTopWidth: 1,
-          height: Platform.OS === "ios" ? 84 : 64,
+          height: 58 + paddingInferior,
           paddingTop: 8,
-          paddingBottom: Platform.OS === "ios" ? 24 : 8,
+          paddingBottom: paddingInferior,
         },
         tabBarLabelStyle: {
           fontSize: 12,

@@ -114,7 +114,7 @@ export function ParadasScreen() {
 
             notificarNuevosAvisosEnLineasFavoritas(
               listaAvisos,
-              auth?.lineasFavoritas ?? ["lin-05", "lin-14"],
+              auth?.lineasFavoritas ?? [],
               auth?.usuario?.avisosActivos ?? true,
             ).catch(() => {});
           }
@@ -211,6 +211,7 @@ export function ParadasScreen() {
 
   return (
     <SafeAreaView
+      edges={["top", "left", "right"]}
       style={[
         styles.safeArea,
         {
