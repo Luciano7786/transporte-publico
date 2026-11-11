@@ -241,14 +241,9 @@ export function ParadaDetalleScreen() {
       tipoDiaSeleccionado,
     );
 
-    const etiquetaMinutos =
-      calc.minutosFaltantesPrimerHorario !== undefined
-        ? calc.minutosFaltantesPrimerHorario === 0
-          ? "llegando ahora, según tabla"
-          : `en ${calc.minutosFaltantesPrimerHorario} min, según tabla`
-        : undefined;
-
     const proximoHora = calc.proximos[0] ?? (lId === "lin-05" ? "10:42" : "10:51");
+
+    const etiquetaMinutos = `según la tabla, pasa a las ${proximoHora}`;
 
     return {
       id: lId,
