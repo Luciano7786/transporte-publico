@@ -105,12 +105,10 @@ export async function programarRecordatorioColectivo(params: {
       content: {
         title: `🚌 Línea ${params.numeroLinea} en 10 minutos`,
         body: `El colectivo de las ${params.horaColectivo} está próximo a pasar por ${params.nombreParada} (según tabla).`,
-        sound: "default",
-        vibrate: [0, 300, 150, 300],
+        sound: true,
         priority: Notifications.AndroidNotificationPriority.MAX,
         color: "#0D254C",
         autoDismiss: true,
-        interruptionLevel: "timeSensitive",
         data: {
           tipo: "recordatorio_horario",
           numeroLinea: params.numeroLinea,
@@ -119,8 +117,11 @@ export async function programarRecordatorioColectivo(params: {
         },
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: fechaObjetivo,
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: Math.max(
+          1,
+          Math.round((fechaObjetivo.getTime() - Date.now()) / 1000),
+        ),
         channelId: CANAL_RECORDATORIOS_ID,
       },
     });
@@ -171,30 +172,22 @@ export async function notificarNuevosAvisosEnLineasFavoritas(
   lineasFavoritas: string[],
   avisosActivos = true,
 ): Promise<void> {
-  if (
-    Platform.OS === "web" ||
-    !avisosActivos ||
-    lineasFavoritas.length === 0 ||
-    avisos.length === 0
-  ) {
+  if (Platform.OS === "web" || !avisosActivos || avisos.length === 0) {
     return;
   }
 
   try {
     const ahoraIso = new Date().toISOString();
-    const avisosFavoritasVigentes = avisos.filter(
-      (a) =>
-        a.desde <= ahoraIso &&
-        (!a.hasta || a.hasta >= ahoraIso) &&
-        a.lineaIds.some((id) => lineasFavoritas.includes(id)),
+    const avisosVigentes = avisos.filter(
+      (a) => a.desde <= ahoraIso && (!a.hasta || a.hasta >= ahoraIso),
     );
 
-    if (avisosFavoritasVigentes.length === 0) return;
+    if (avisosVigentes.length === 0) return;
 
     const guardado = await Storage.getItem(CLAVE_AVISOS_NOTIFICADOS);
     const idsYaNotificados: string[] = guardado ? JSON.parse(guardado) : [];
 
-    const nuevos = avisosFavoritasVigentes.filter(
+    const nuevos = avisosVigentes.filter(
       (a) => !idsYaNotificados.includes(a.id),
     );
     if (nuevos.length === 0) return;
@@ -206,16 +199,21 @@ export async function notificarNuevosAvisosEnLineasFavoritas(
       const lineasTexto = aviso.lineaIds
         .map((id) => id.replace("lin-0", "L").replace("lin-", "L"))
         .join(", ");
+      const esDeFavorita =
+        lineasFavoritas.length > 0 &&
+        aviso.lineaIds.some((id) => lineasFavoritas.includes(id));
 
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: `⚠️ Aviso en tu línea favorita (${lineasTexto})`,
+          title: esDeFavorita
+            ? `⚠️ Aviso en tu línea favorita (${lineasTexto})`
+            : `📢 Nuevo aviso de Transporte (${lineasTexto})`,
           body: `${aviso.titulo}: ${aviso.detalle}`,
           sound: "default",
           priority: Notifications.AndroidNotificationPriority.HIGH,
           color: "#D97706",
           data: {
-            tipo: "aviso_linea_favorita",
+            tipo: "aviso_transporte",
             avisoId: aviso.id,
             lineaIds: aviso.lineaIds,
           },

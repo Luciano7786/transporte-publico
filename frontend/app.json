@@ -65,9 +65,7 @@
       ],
       [
         "expo-local-authentication",
-        {
-          "faceIDPermission": "Permite desbloquear tu sesión rápidamente con huella digital o reconocimiento facial."
-        }
+        {}
       ],
       [
         "expo-notifications",

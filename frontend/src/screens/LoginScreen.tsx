@@ -76,27 +76,23 @@ export default function LoginScreen() {
   };
 
   const handleIngresoBiometrico = async () => {
-    const exito = await auth?.autenticarConBiometria();
-    if (exito) {
-      if (!auth?.usuario) {
-        try {
-          setCargando(true);
-          await auth?.iniciarSesion("julian@mail.com", "demo1234");
-        } catch {
-        } finally {
-          setCargando(false);
+    try {
+      setCargando(true);
+      const exito = await auth?.iniciarSesionConHuella();
+      if (exito) {
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        } else {
+          navigation.replace("MainTabs");
         }
-      }
-      if (navigation.canGoBack()) {
-        navigation.goBack();
       } else {
-        navigation.replace("MainTabs");
+        Alert.alert(
+          "Autenticación cancelada",
+          "No se pudo verificar tu huella digital. Ingresá con tu correo y contraseña.",
+        );
       }
-    } else {
-      Alert.alert(
-        "Autenticación cancelada",
-        "Podés ingresar con tu correo y contraseña.",
-      );
+    } finally {
+      setCargando(false);
     }
   };
 
@@ -234,7 +230,10 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            {!modoRegistro && auth?.biometriaDisponible ? (
+            {!modoRegistro &&
+            auth?.biometriaDisponible &&
+            auth?.biometriaHabilitada &&
+            auth?.tieneSesionBiometricaGuardada ? (
               <TouchableOpacity
                 style={[
                   styles.botonBiometria,
@@ -250,7 +249,7 @@ export default function LoginScreen() {
                 <Text
                   style={[styles.botonBiometriaTexto, { color: paleta.textoAlto }]}
                 >
-                  Ingresar con huella o biometría
+                  Ingresar con huella digital
                 </Text>
               </TouchableOpacity>
             ) : null}

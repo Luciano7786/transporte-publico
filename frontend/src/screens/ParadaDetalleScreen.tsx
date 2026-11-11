@@ -180,8 +180,12 @@ export function ParadaDetalleScreen() {
 
     const ahora = new Date();
     const [hh, mm] = horaColectivo.split(":").map(Number);
-    const fechaAviso = new Date(ahora);
-    fechaAviso.setHours(hh, mm - 10, 0, 0);
+    const fechaColectivo = new Date(ahora);
+    fechaColectivo.setHours(hh, mm, 0, 0);
+    if (fechaColectivo.getTime() <= ahora.getTime()) {
+      fechaColectivo.setDate(fechaColectivo.getDate() + 1);
+    }
+    const fechaAviso = new Date(fechaColectivo.getTime() - 10 * 60 * 1000);
 
     const segundosRestantes = Math.floor(
       (fechaAviso.getTime() - ahora.getTime()) / 1000,
@@ -211,14 +215,13 @@ export function ParadaDetalleScreen() {
 
     if (notifId) {
       notificacionesIdsRef.current[clave] = notifId;
-    } else if (diferenciaMin > 0) {
-      timersRecordatorioRef.current[clave] = setTimeout(() => {
-        Alert.alert(
-          `🚌 Línea ${numeroLinea} en 10 minutos`,
-          `El colectivo de las ${horaColectivo} está próximo a pasar por ${parada.nombre} (según tabla).`,
-        );
-        setRecordatoriosActivos((prev) => ({ ...prev, [clave]: false }));
-      }, diferenciaMin * 60 * 1000);
+    } else {
+      setRecordatoriosActivos((prev) => ({ ...prev, [clave]: false }));
+      Alert.alert(
+        "No se pudo programar",
+        "Revisá que las notificaciones estén permitidas para la app en los ajustes del teléfono e intentá de nuevo.",
+      );
+      return;
     }
 
     Alert.alert(
@@ -284,7 +287,23 @@ export function ParadaDetalleScreen() {
             navigation.navigate("MainTabs");
           }
         }}
-        onToggleFavorita={() => auth?.alternarParadaFavorita(parada.id)}
+        onToggleFavorita={() => {
+          if (!auth?.usuario) {
+            Alert.alert(
+              "Iniciá sesión",
+              "Necesitás tener una cuenta e iniciar sesión para guardar paradas favoritas.",
+              [
+                { text: "Cancelar", style: "cancel" },
+                {
+                  text: "Iniciar sesión",
+                  onPress: () => navigation.navigate("Login"),
+                },
+              ],
+            );
+            return;
+          }
+          auth.alternarParadaFavorita(parada.id);
+        }}
       />
 
       <ScrollView
