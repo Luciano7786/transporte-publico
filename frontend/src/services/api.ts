@@ -28,10 +28,6 @@ export const apiService = {
     return res.datos;
   },
 
-  /**
-   * Sube una foto o video a la API (`POST /archivos`).
-   * Retorna la URL pública accesible del archivo guardado.
-   */
   subirArchivo: async (
     archivo: { uri: string; name?: string; type?: string },
   ): Promise<ArchivoSubido> => {

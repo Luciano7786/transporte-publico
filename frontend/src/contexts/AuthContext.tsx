@@ -104,7 +104,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function restaurar() {
       try {
-        // 1. Verificar soporte de hardware biométrico
         const tieneHardware = await LocalAuthentication.hasHardwareAsync().catch(
           () => false,
         );
@@ -115,7 +114,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setBiometriaDisponible(tieneHardware && tieneRegistros);
         }
 
-        // 2. Cargar favoritos locales y configuración de biometría
         const [favLineasRaw, favParadasRaw, bioRaw] = await Promise.all([
           Storage.getItem(CLAVE_LINEAS_FAV_LOCAL).catch(() => null),
           Storage.getItem(CLAVE_PARADAS_FAV_LOCAL).catch(() => null),
@@ -128,7 +126,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setBiometriaHabilitadaState(bioRaw === "true");
         }
 
-        // 3. Restaurar sesión si existe token en SecureStore y usuario en kv-store
         const token = await SecureStore.getItemAsync(CLAVE_TOKEN).catch(
           () => null,
         );
@@ -138,7 +135,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (token && guardado) {
           if (!cancelado) setUsuario(guardado);
-          // Intentar refrescar perfil en segundo plano desde la API
           obtenerPerfilServicio()
             .then(async (res) => {
               if (!cancelado && res.datos) {
@@ -154,7 +150,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await borrarSesionGuardada();
         }
       } catch {
-        // Arrancamos sin sesión ante fallo de lectura
       } finally {
         if (!cancelado) setRestaurando(false);
       }
@@ -262,7 +257,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }
         } catch {
-          // Si no hay conexión, se mantiene el cambio local en el perfil cacheado
         }
       } else {
         setLineasFavLocales(nuevaLista);
@@ -307,7 +301,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }
         } catch {
-          // Si no hay conexión, se conserva el cambio en el perfil local
         }
       } else {
         setParadasFavLocales(nuevaLista);
@@ -347,7 +340,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ).catch(() => {});
         }
       } catch {
-        // Si falla por falta de red, el cambio ya quedó persistido localmente
       }
     },
     [usuario],

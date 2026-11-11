@@ -38,7 +38,6 @@ export function ReportarDemoraScreen() {
   const [parada, setParada] = useState<Parada | null>(null);
   const [lineasCatalogo, setLineasCatalogo] = useState<Linea[]>([]);
 
-  // Estados del formulario
   const [lineaSeleccionada, setLineaSeleccionada] = useState<string>("lin-05");
   const [motivoSeleccionado, setMotivoSeleccionado] =
     useState<MotivoDemora>("no_paso");
@@ -46,7 +45,6 @@ export function ReportarDemoraScreen() {
   const [fotoUri, setFotoUri] = useState<string | null>(null);
   const [enviando, setEnviando] = useState<boolean>(false);
 
-  // Estados de la cámara nativa (expo-camera)
   const [permisoCamara, solicitarPermisoCamara] = useCameraPermissions();
   const [camaraVisible, setCamaraVisible] = useState<boolean>(false);
   const [capturandoFoto, setCapturandoFoto] = useState<boolean>(false);
@@ -74,7 +72,6 @@ export function ReportarDemoraScreen() {
           setLineasCatalogo(resLineas.value.datos);
         }
       } catch {
-        // Fallback silencioso
       }
     }
     cargarLineasDeParada();
@@ -204,7 +201,7 @@ export function ReportarDemoraScreen() {
       Alert.alert(
         esOffline ? "Guardado sin conexión" : "Reporte enviado",
         esOffline
-          ? "No hay señal de internet. Tu reporte se guardó localmente en SQLite y se enviará automáticamente al recuperar conexión."
+          ? "No hay señal de internet. Tu reporte se guardó localmente y se enviará automáticamente al recuperar conexión."
           : "Tu aviso fue registrado. Los demás pasajeros que esperan en la parada podrán verlo y confirmarlo.",
         [
           {
@@ -234,7 +231,6 @@ export function ReportarDemoraScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: paleta.fondoApp }]}
     >
-      {/* 1. Header */}
       <View style={styles.header}>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -260,7 +256,6 @@ export function ReportarDemoraScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 2. Subtítulo y selector dinámico de todas las líneas de la parada */}
         <Text style={[styles.subtitulo, { color: paleta.textoMedio }]}>
           Desde {nombreParada} · ¿qué línea?
         </Text>
@@ -299,7 +294,6 @@ export function ReportarDemoraScreen() {
           })}
         </View>
 
-        {/* 3. Lista de Motivos con Radio Buttons */}
         <View style={styles.motivosContainer}>
           {opcionesMotivo.map((opcion) => {
             const isSelected = motivoSeleccionado === opcion.id;
@@ -317,7 +311,6 @@ export function ReportarDemoraScreen() {
                   },
                 ]}
               >
-                {/* Radio Button */}
                 <View
                   style={[
                     styles.radioCircle,
@@ -338,7 +331,6 @@ export function ReportarDemoraScreen() {
                   )}
                 </View>
 
-                {/* Texto del motivo */}
                 <Text
                   style={[
                     styles.motivoTexto,
@@ -354,7 +346,6 @@ export function ReportarDemoraScreen() {
           })}
         </View>
 
-        {/* 4. Campo de Comentario Opcional */}
         <TextInput
           value={comentario}
           onChangeText={setComentario}
@@ -370,7 +361,6 @@ export function ReportarDemoraScreen() {
           ]}
         />
 
-        {/* 5. Acciones de Foto */}
         <View style={styles.fotoBotonesRow}>
           <TouchableOpacity
             activeOpacity={0.8}
@@ -405,7 +395,6 @@ export function ReportarDemoraScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Vista previa de foto adjunta si existe */}
         {fotoUri && (
           <View style={styles.fotoPreviewContainer}>
             <Image source={{ uri: fotoUri }} style={styles.fotoThumbnail} />
@@ -422,7 +411,6 @@ export function ReportarDemoraScreen() {
         )}
       </ScrollView>
 
-      {/* 6. Botón Inferior: Enviar reporte */}
       <View
         style={[
           styles.footer,
@@ -452,7 +440,6 @@ export function ReportarDemoraScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 7. Modal de Cámara Nativa (expo-camera) para tomar foto real */}
       <Modal
         visible={camaraVisible}
         animationType="slide"

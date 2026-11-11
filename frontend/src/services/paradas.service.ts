@@ -22,9 +22,6 @@ export interface FiltrosParadas {
   porPagina?: number;
 }
 
-/**
- * Determina si el error recibido corresponde a un corte de conexión o a un túnel/servidor caído.
- */
 function esErrorDeConexion(error: unknown): boolean {
   if (!(error instanceof ErrorApi)) return false;
   return (
@@ -35,11 +32,6 @@ function esErrorDeConexion(error: unknown): boolean {
   );
 }
 
-/**
- * Obtiene la lista de paradas.
- * Estrategia de Resiliencia: guarda en SQLite cuando hay red y sirve de la base
- * local ante desconexión o fallo de señal (SIN_CONEXION).
- */
 export const obtenerParadas = async (
   filtros?: FiltrosParadas,
 ): Promise<RespuestaExitosa<Parada[]>> => {
@@ -56,7 +48,6 @@ export const obtenerParadas = async (
 
   try {
     const res = await clienteHttp<Parada[]>(`/paradas?${params.toString()}`);
-    // Si trajimos el catálogo general, lo persistimos en la base local
     if (res.datos && res.datos.length > 0 && !filtros?.q && !filtros?.lineaId) {
       guardarParadasEnCache(res.datos).catch((err) =>
         console.warn("No se pudo cachear paradas en SQLite:", err),
@@ -92,9 +83,6 @@ export const obtenerParadas = async (
   }
 };
 
-/**
- * Obtiene el detalle de una parada por su ID (ej: "par-101").
- */
 export const obtenerParadaPorId = async (
   id: string,
 ): Promise<RespuestaExitosa<Parada>> => {
@@ -111,10 +99,6 @@ export const obtenerParadaPorId = async (
   }
 };
 
-/**
- * Resuelve una parada a partir de su código QR (ej: "PARANA:par-101").
- * Si no hay conexión a internet, busca en la base local por el código QR o ID.
- */
 export const obtenerParadaPorQr = async (
   codigo: string,
 ): Promise<RespuestaExitosa<Parada>> => {
@@ -131,10 +115,6 @@ export const obtenerParadaPorQr = async (
   }
 };
 
-/**
- * Obtiene los horarios de tabla para una parada (y opcionalmente una línea, sentido o tipo de día).
- * Estrategia de Resiliencia: persiste los horarios en cache_horarios y responde con ellos sin red.
- */
 export const obtenerHorariosPorParada = async (
   paradaId: string,
   lineaId?: string,
@@ -183,9 +163,6 @@ export const obtenerHorariosPorParada = async (
   }
 };
 
-/**
- * Determina el tipo de día actual ("habil", "sabado", "domingo") según la fecha del dispositivo.
- */
 export function obtenerTipoDeDiaActual(fecha = new Date()): TipoDeDia {
   const diaSemana = fecha.getDay();
   if (diaSemana === 0) return "domingo";
@@ -193,9 +170,6 @@ export function obtenerTipoDeDiaActual(fecha = new Date()): TipoDeDia {
   return "habil";
 }
 
-/**
- * Consulta en la API los próximos pasos de colectivos en una parada dada según la hora actual.
- */
 export const obtenerProximosHorariosApi = (
   paradaId: string,
   cantidad = 3,
@@ -210,11 +184,6 @@ export const obtenerProximosHorariosApi = (
   );
 };
 
-/**
- * Calcula los próximos horarios de una línea en una parada a partir de una hora de referencia (HH:MM)
- * y opcionalmente un tipo de día ("habil", "sabado", "domingo", "feriado").
- * Si no se pasa horaReferencia, toma la hora real del reloj del dispositivo.
- */
 export function calcularProximosHorarios(
   horarios: Horario[],
   lineaId: string,
@@ -233,13 +202,11 @@ export function calcularProximosHorarios(
 
   if (tipoDeDia) {
     const porDia = filtradosPorLinea.filter((h) => h.tipoDeDia === tipoDeDia);
-    // Si hay horarios cargados para ese tipo de día, los usamos; si no, caemos a los hábiles disponibles
     if (porDia.length > 0) {
       filtradosPorLinea = porDia;
     }
   }
 
-  // Quitamos duplicados de hora y ordenamos ascendentemente
   const horasUnicas = Array.from(new Set(filtradosPorLinea.map((h) => h.hora))).sort((a, b) =>
     a.localeCompare(b),
   );
@@ -248,7 +215,6 @@ export function calcularProximosHorarios(
     return { proximos: [], todosDelDia: [], finalizoServicio: false };
   }
 
-  // Hora actual del sistema en formato HH:MM si no se especifica
   let horaRef = horaReferencia;
   if (!horaRef) {
     const ahora = new Date();
@@ -273,7 +239,6 @@ export function calcularProximosHorarios(
 
   const seleccionados = futuros.slice(0, cantidad);
 
-  // Cálculo de minutos restantes para el primero
   const [refH, refM] = horaRef.split(":").map(Number);
   const [proxH, proxM] = seleccionados[0].split(":").map(Number);
   const minutosFaltantes = proxH * 60 + proxM - (refH * 60 + refM);

@@ -33,7 +33,6 @@ export const ThemeContextProvider = ({ children }: { children: ReactNode }) => {
           setTemaUsuarioState(guardado);
         }
       } catch {
-        // En caso de error o entorno sin kv-store, mantenemos "sistema"
       }
     }
     cargarTemaGuardado();

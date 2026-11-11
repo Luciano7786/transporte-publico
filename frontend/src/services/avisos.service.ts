@@ -3,9 +3,6 @@ import { obtenerAvisos, obtenerUltimaActualizacionAvisos } from "./lineas.servic
 
 export type FiltroAvisos = "vigentes" | "mis_lineas" | "vencidos";
 
-/**
- * Filtra una lista de avisos según el filtro seleccionado.
- */
 export function filtrarAvisos(
   avisos: Aviso[],
   filtro: FiltroAvisos,
@@ -36,10 +33,6 @@ export function filtrarAvisos(
   });
 }
 
-/**
- * Formatea el rango de fechas para la cabecera de la tarjeta del aviso.
- * Ej: "14/9 al 5/10" o "Sin fecha de fin".
- */
 export function formatearRangoFechas(
   desdeIso: string,
   hastaIso: string | null,
@@ -60,10 +53,6 @@ export function formatearRangoFechas(
   return `${diaDesde}/${mesDesde} al ${diaHasta}/${mesHasta}`;
 }
 
-/**
- * Formatea el tiempo transcurrido desde la última actualización de la lista.
- * Ej: "Actualizado recién", "Actualizado hace 3 min", "Sin conexión · actualizado hace 12 min".
- */
 export function formatearTiempoActualizacion(
   minutosAtras = 0,
   desdeCache = false,

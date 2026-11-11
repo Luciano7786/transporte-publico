@@ -126,10 +126,9 @@ export function LineaDetalleScreen() {
             const encontrada = todasParadas.find((p) => p.id === id);
             let estado: "normal" | "sin_servicio" | "provisoria" = "normal";
 
-            // Solo marcamos paradas afectadas si la línea tiene un desvío activo en sentido ida
             if (sentido === "ida" && tieneDesvioActivo) {
-              if (id === "par-103") estado = "sin_servicio"; // Corrientes y 25 de Mayo
-              if (id === "par-104") estado = "provisoria"; // Santa Fe y Urquiza
+              if (id === "par-103") estado = "sin_servicio";
+              if (id === "par-104") estado = "provisoria";
             }
 
             return {
@@ -170,7 +169,6 @@ export function LineaDetalleScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: paleta.fondoApp }]}
     >
-      {/* 1. Header con volver, badge de línea, nombre y favorito */}
       <LineaHeader
         numero={linea.numero}
         nombre={linea.nombre}
@@ -191,7 +189,6 @@ export function LineaDetalleScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 2. Banner de desvío vigente */}
         {aviso && aviso.gravedad === "desvio" ? (
           <LineaAvisoBanner
             titulo={aviso.titulo}
@@ -200,7 +197,6 @@ export function LineaDetalleScreen() {
           />
         ) : null}
 
-        {/* 3. Selector de Sentido (Ida / Vuelta) */}
         <SentidoSelector
           sentido={sentido}
           destinoIda={recorridoIda?.destino ?? "a Bajada Grande"}
@@ -208,7 +204,6 @@ export function LineaDetalleScreen() {
           onChange={setSentido}
         />
 
-        {/* 4. Mapa del recorrido (con trazado alternativo punteado si hay desvío en ida) */}
         <MapaRecorrido
           trazadoNormal={recorridoActual?.trazado ?? []}
           trazadoAlternativo={
@@ -224,7 +219,6 @@ export function LineaDetalleScreen() {
           }
         />
 
-        {/* 5. Timeline vertical de paradas */}
         <ParadasTimeline
           paradas={
             paradasMapeadas.length > 0

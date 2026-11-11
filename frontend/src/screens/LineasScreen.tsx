@@ -80,7 +80,6 @@ export function LinesScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: paleta.fondoApp }]}
     >
-      {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.titulo, { color: paleta.textoAlto }]}>Líneas</Text>
         <Text style={[styles.subtitulo, { color: paleta.textoBajo }]}>
@@ -121,7 +120,6 @@ export function LinesScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        /* Listado de Líneas */
         <FlatList
           data={lineas}
           keyExtractor={(item) => item.id}
@@ -156,14 +154,12 @@ export function LinesScreen() {
                 },
               ]}
             >
-              {/* Badge con número de línea */}
               <View
                 style={[styles.lineaBadge, { backgroundColor: item.color }]}
               >
                 <Text style={styles.lineaNumero}>{item.numero}</Text>
               </View>
 
-              {/* Información central */}
               <View style={styles.infoCentral}>
                 <Text
                   style={[styles.nombreLinea, { color: paleta.textoAlto }]}
@@ -179,7 +175,6 @@ export function LinesScreen() {
                 </Text>
               </View>
 
-              {/* Insignia de Estado (Desvío o Normal) */}
               <View
                 style={[
                   styles.estadoBadge,

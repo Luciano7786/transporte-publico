@@ -46,7 +46,6 @@ export function AvisosScreen() {
   const [mostrandoCacheOffline, setMostrandoCacheOffline] =
     useState<boolean>(false);
 
-  // Estado del modal de video
   const [videoModalVisible, setVideoModalVisible] = useState(false);
   const [videoUrlActual, setVideoUrlActual] = useState<string | null>(null);
 
@@ -108,7 +107,6 @@ export function AvisosScreen() {
     cargarDatos(false);
   }, []);
 
-  // Recalcula cada 30 segundos cuántos minutos pasaron desde la última actualización real
   useEffect(() => {
     const calcularMinutos = () => {
       const diffMs = Date.now() - new Date(ultimaActualizacionIso).getTime();
@@ -125,7 +123,6 @@ export function AvisosScreen() {
     setRefrescando(false);
   };
 
-  // Filtrado de avisos según el chip activo y las líneas favoritas del pasajero
   const avisosFiltrados = filtrarAvisos(
     todosAvisos,
     filtroActual,
@@ -145,16 +142,13 @@ export function AvisosScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: paleta.fondoApp }]}
     >
-      {/* 1. Header */}
       <AvisosHeader titulo="Avisos" />
 
-      {/* 2. Chips de Filtrado */}
       <FiltrosAvisos
         filtroActual={filtroActual}
         onChangeFiltro={setFiltroActual}
       />
 
-      {/* Aviso de información guardada cuando no hay señal */}
       {mostrandoCacheOffline ? (
         <View
           style={[
@@ -176,7 +170,6 @@ export function AvisosScreen() {
         </View>
       ) : null}
 
-      {/* 3. Listado de Avisos */}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -246,7 +239,6 @@ export function AvisosScreen() {
           ))
         )}
 
-        {/* 4. Pie de estado de actualización con antigüedad real */}
         <Text style={[styles.actualizadoTexto, { color: paleta.textoBajo }]}>
           {formatearTiempoActualizacion(
             minutosTranscurridos,
@@ -255,7 +247,6 @@ export function AvisosScreen() {
         </Text>
       </ScrollView>
 
-      {/* 5. Modal de reproducción de video */}
       <VideoModal
         visible={videoModalVisible}
         videoUrl={videoUrlActual}

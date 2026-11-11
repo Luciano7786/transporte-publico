@@ -78,13 +78,11 @@ export default function LoginScreen() {
   const handleIngresoBiometrico = async () => {
     const exito = await auth?.autenticarConBiometria();
     if (exito) {
-      // Si no hay sesión activa aún, ingresamos con la cuenta demo precargada de Paraná
       if (!auth?.usuario) {
         try {
           setCargando(true);
-          await auth?.iniciarSesion("lucia.perez@correo.ar", "parana2026");
+          await auth?.iniciarSesion("julian@mail.com", "demo1234");
         } catch {
-          // Si no hay conexión, vuelve a las pestañas principales
         } finally {
           setCargando(false);
         }
@@ -104,8 +102,8 @@ export default function LoginScreen() {
 
   const handleAutocompletarDemo = () => {
     setModoRegistro(false);
-    setEmail("lucia.perez@correo.ar");
-    setPassword("parana2026");
+    setEmail("julian@mail.com");
+    setPassword("demo1234");
   };
 
   return (
@@ -120,7 +118,6 @@ export default function LoginScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Botón volver arriba */}
           <TouchableOpacity
             onPress={() => {
               if (navigation.canGoBack()) {
@@ -237,7 +234,6 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Reingreso rápido con huella o rostro (expo-local-authentication) */}
             {!modoRegistro && auth?.biometriaDisponible ? (
               <TouchableOpacity
                 style={[
@@ -259,19 +255,17 @@ export default function LoginScreen() {
               </TouchableOpacity>
             ) : null}
 
-            {/* Botón rápido de credenciales de prueba de la cátedra */}
             {!modoRegistro ? (
               <TouchableOpacity
                 onPress={handleAutocompletarDemo}
                 style={styles.demoBtn}
               >
                 <Text style={[styles.demoText, { color: paleta.textoMedio }]}>
-                  Usar cuenta de prueba (lucia.perez@correo.ar)
+                  Usar cuenta de prueba (julian@mail.com · demo1234)
                 </Text>
               </TouchableOpacity>
             ) : null}
 
-            {/* Alternar entre Login y Registro */}
             <TouchableOpacity
               onPress={() => setModoRegistro((prev) => !prev)}
               style={styles.switchModeBtn}

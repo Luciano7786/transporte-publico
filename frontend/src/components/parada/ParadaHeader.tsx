@@ -20,7 +20,6 @@ export const ParadaHeader: React.FC<ParadaHeaderProps> = ({
 
   return (
     <View style={styles.header}>
-      {/* Botón Volver */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={onPressVolver}
@@ -37,7 +36,6 @@ export const ParadaHeader: React.FC<ParadaHeaderProps> = ({
         <Ionicons name="chevron-back" size={22} color={paleta.textoAlto} />
       </TouchableOpacity>
 
-      {/* Nombre de la parada */}
       <Text
         style={[styles.nombre, { color: paleta.textoAlto }]}
         numberOfLines={1}
@@ -45,7 +43,6 @@ export const ParadaHeader: React.FC<ParadaHeaderProps> = ({
         {nombre}
       </Text>
 
-      {/* Botón Favorita */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={onToggleFavorita}

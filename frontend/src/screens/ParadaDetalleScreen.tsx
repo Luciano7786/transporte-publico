@@ -112,7 +112,6 @@ export function ParadaDetalleScreen() {
     };
   }, [paradaId]);
 
-  // Refresca los reportes al regresar de la pantalla "Reportar una demora"
   useFocusEffect(
     useCallback(() => {
       let activo = true;
@@ -131,7 +130,6 @@ export function ParadaDetalleScreen() {
 
   const handleConfirmarDemora = async (reporteId: string) => {
     try {
-      // Vibración háptica corta mediante expo-haptics al confirmar un reporte ajeno
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
         () => {},
       );
@@ -180,7 +178,6 @@ export function ParadaDetalleScreen() {
       return;
     }
 
-    // Calculamos cuánto falta para 10 minutos antes del colectivo
     const ahora = new Date();
     const [hh, mm] = horaColectivo.split(":").map(Number);
     const minutosObjetivo = hh * 60 + mm - 10;
@@ -206,7 +203,6 @@ export function ParadaDetalleScreen() {
     if (notifId) {
       notificacionesIdsRef.current[clave] = notifId;
     } else if (diferenciaMin > 0) {
-      // Fallback de aviso en pantalla si las notificaciones del sistema están restringidas
       timersRecordatorioRef.current[clave] = setTimeout(() => {
         Alert.alert(
           `🚌 Línea ${numeroLinea} en 10 minutos`,
@@ -224,14 +220,12 @@ export function ParadaDetalleScreen() {
     );
   };
 
-  // Configuramos todas las líneas que pasan por la parada según el día seleccionado y la hora actual real
   const infoLineas = parada.lineaIds.map((lId) => {
     const lObj = lineas.find((l) => l.id === lId);
     const numero = lObj?.numero ?? lId.replace("lin-0", "").replace("lin-", "");
     const color =
       lObj?.color ?? (lId === "lin-05" ? "#1B6CA8" : "#B45309");
 
-    // Destino según sentido de la parada
     const recorridoParada = lObj?.recorridos.find(
       (r) => r.sentido === parada.sentido,
     );
@@ -242,7 +236,7 @@ export function ParadaDetalleScreen() {
     const calc = calcularProximosHorarios(
       horarios,
       lId,
-      undefined, // Usa la hora real del reloj del dispositivo
+      undefined,
       3,
       tipoDiaSeleccionado,
     );
@@ -276,7 +270,6 @@ export function ParadaDetalleScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: paleta.fondoApp }]}
     >
-      {/* 1. Header con volver, nombre y estrella de favorito */}
       <ParadaHeader
         nombre={parada.nombre}
         esFavorita={esFavorita}
@@ -295,7 +288,6 @@ export function ParadaDetalleScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 2. Barra de orientación con brújula/rumbo y enlace Cómo llegar */}
         <ParadaInfoBar
           distancia={distanciaTexto}
           sentidoTexto={parada.sentido === "ida" ? "hacia el centro" : "sentido vuelta"}
@@ -304,7 +296,6 @@ export function ParadaDetalleScreen() {
           nombreParada={parada.nombre}
         />
 
-        {/* 3. Selector de tipo de día (Hábiles / Sábados / Domingos / Feriados) */}
         <View style={styles.selectorDiaContainer}>
           {OPCIONES_DIA.map((op) => {
             const activo = tipoDiaSeleccionado === op.id;
@@ -338,7 +329,6 @@ export function ParadaDetalleScreen() {
           })}
         </View>
 
-        {/* 4. Tarjetas de cada línea con sus horarios, tabla completa y recordatorio */}
         {infoLineas.map((item) => (
           <LineaHorarioCard
             key={item.id}
@@ -357,7 +347,6 @@ export function ParadaDetalleScreen() {
           />
         ))}
 
-        {/* 5. Reporte de demoras colaborativo */}
         {reportes.map((rep) => (
           <DemoraReporteCard
             key={rep.id}
@@ -368,7 +357,6 @@ export function ParadaDetalleScreen() {
         ))}
       </ScrollView>
 
-      {/* 6. Botón inferior fijo: Reportar una demora */}
       <View
         style={[
           styles.footer,

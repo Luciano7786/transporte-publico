@@ -20,10 +20,6 @@ interface VideoModalProps {
   onClose: () => void;
 }
 
-/**
- * Resuelve la URL del video para que apunte al backend real si viene como ruta relativa
- * o como URL simulada del dominio municipal.
- */
 function resolverUrlVideo(videoUrl: string | null): string {
   const baseBackend = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
   const fallbackBackend = `${baseBackend}/archivos/desvio-corrientes.mp4`;
@@ -34,7 +30,6 @@ function resolverUrlVideo(videoUrl: string | null): string {
     return `${baseBackend}${videoUrl}`;
   }
 
-  // Si la URL viene de los mocks con el dominio ficticio api.parana.gob.ar, redirigimos al MP4 real del backend
   if (videoUrl.includes("api.parana.gob.ar")) {
     return fallbackBackend;
   }
@@ -42,10 +37,6 @@ function resolverUrlVideo(videoUrl: string | null): string {
   return videoUrl;
 }
 
-/**
- * Descarga y cachea el archivo MP4 del desvío en el directorio de caché local del dispositivo
- * utilizando expo-file-system, para que pueda reproducirse incluso sin señal.
- */
 async function obtenerOCachearVideoLocal(urlRemota: string): Promise<string> {
   if (Platform.OS === "web") return urlRemota;
 
@@ -102,7 +93,6 @@ export const VideoModal: React.FC<VideoModalProps> = ({
     };
   }, [visible, urlResuelta]);
 
-  // Reproductor nativo de expo-video
   const player = useVideoPlayer(fuenteVideo, (instancia) => {
     instancia.loop = true;
     if (visible) {
@@ -269,7 +259,6 @@ export const VideoModal: React.FC<VideoModalProps> = ({
             },
           ]}
         >
-          {/* Header del Modal */}
           <View style={styles.header}>
             <Text
               style={[styles.titulo, { color: paleta.textoAlto }]}
@@ -285,7 +274,6 @@ export const VideoModal: React.FC<VideoModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Área de Reproducción de Video (expo-video nativo con caché en expo-file-system y fallback animado) */}
           <View style={[styles.playerArea, { backgroundColor: "#000000" }]}>
             {!usarFallbackAnimado && Platform.OS !== "web" ? (
               <VideoView
@@ -315,7 +303,6 @@ export const VideoModal: React.FC<VideoModalProps> = ({
             )}
           </View>
 
-          {/* Descripción explicativa */}
           <View style={styles.body}>
             <Text style={[styles.caption, { color: paleta.textoMedio }]}>
               Video corto (20 s) publicado por la Dirección de Transporte

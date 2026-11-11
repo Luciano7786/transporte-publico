@@ -18,7 +18,6 @@ const generarHorarios = (
     hora,
   }));
 
-// Horarios para Alameda y Urquiza (par-101) tal como se ven en la maqueta
 const HORARIOS_L5_HABIL = [
   "05:20", "05:42", "06:02", "06:22", "06:42", "07:02", "07:22", "07:42",
   "08:02", "08:22", "08:42", "09:02", "09:22", "09:42",

@@ -24,7 +24,6 @@ export const LineaHeader: React.FC<LineaHeaderProps> = ({
 
   return (
     <View style={styles.header}>
-      {/* Botón Volver */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={onPressVolver}
@@ -41,12 +40,10 @@ export const LineaHeader: React.FC<LineaHeaderProps> = ({
         <Ionicons name="chevron-back" size={22} color={paleta.textoAlto} />
       </TouchableOpacity>
 
-      {/* Badge de la línea */}
       <View style={[styles.badge, { backgroundColor: color }]}>
         <Text style={styles.badgeTexto}>{numero}</Text>
       </View>
 
-      {/* Nombre de la línea */}
       <Text
         style={[styles.nombre, { color: paleta.textoAlto }]}
         numberOfLines={1}
@@ -54,7 +51,6 @@ export const LineaHeader: React.FC<LineaHeaderProps> = ({
         {nombre}
       </Text>
 
-      {/* Estrella de Favorito */}
       {onToggleFavorita ? (
         <TouchableOpacity
           activeOpacity={0.7}

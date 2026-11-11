@@ -18,11 +18,6 @@ export interface ArchivoSubido {
   bytes: number;
 }
 
-/**
- * Guarda de forma persistente en el dispositivo una foto capturada con expo-camera
- * o seleccionada con expo-image-picker, utilizando la API nueva de expo-file-system
- * (File, Directory, Paths). Devuelve la URI local dentro de Paths.document.
- */
 export function guardarFotoReporteEnDispositivo(uriOrigen: string): string {
   if (Platform.OS === "web" || !uriOrigen) return uriOrigen;
 
@@ -37,7 +32,6 @@ export function guardarFotoReporteEnDispositivo(uriOrigen: string): string {
       return uriOrigen;
     }
 
-    // Si ya está dentro de nuestro directorio persistente, lo devolvemos tal cual
     if (uriOrigen.includes("reportes-fotos")) {
       return archivoOrigen.uri;
     }
@@ -61,11 +55,6 @@ export function guardarFotoReporteEnDispositivo(uriOrigen: string): string {
   }
 }
 
-/**
- * Sube una foto capturada con la cámara o seleccionada de la galería a POST /api/v1/archivos.
- * Lee y valida el archivo en el dispositivo con la API nueva de expo-file-system (File).
- * Devuelve la URL pública asignada por el servidor para adjuntarla en fotoUri del reporte.
- */
 export async function subirArchivoImagen(
   uriLocal: string,
 ): Promise<RespuestaExitosa<ArchivoSubido>> {
@@ -100,9 +89,6 @@ export async function subirArchivoImagen(
   });
 }
 
-/**
- * Determina si el error recibido corresponde a un corte de conexión o a un túnel/servidor caído.
- */
 function esErrorDeConexion(error: unknown): boolean {
   if (!(error instanceof ErrorApi)) return false;
   return (
@@ -113,11 +99,6 @@ function esErrorDeConexion(error: unknown): boolean {
   );
 }
 
-/**
- * Obtiene los reportes de demora recientes (últimos 90 minutos) de una parada.
- * Si el backend no está disponible, combina los reportes pendientes guardados en SQLite
- * con los reportes semilla de la parada para que el APK funcione sin servidor.
- */
 export const obtenerReportesPorParada = async (
   paradaId: string,
 ): Promise<RespuestaExitosa<ReporteDeDemora[]>> => {
@@ -159,10 +140,6 @@ export const obtenerReportesPorParada = async (
   }
 };
 
-/**
- * Confirma un reporte de demora existente.
- * Si el backend no está disponible, actualiza el contador localmente.
- */
 export const confirmarReporte = async (
   reporteId: string,
 ): Promise<RespuestaExitosa<ReporteDeDemora>> => {
@@ -205,11 +182,6 @@ export const confirmarReporte = async (
   }
 };
 
-/**
- * Crea un nuevo reporte de demora.
- * Estrategia de Resiliencia: si no hay internet (SIN_CONEXION), guarda el reporte
- * en la tabla local cola_reportes_offline de SQLite para sincronizarlo al recuperar señal.
- */
 export const crearReporte = async (nuevo: {
   id?: string;
   lineaId: string;
@@ -231,7 +203,6 @@ export const crearReporte = async (nuevo: {
   if (nuevo.id) payload.id = nuevo.id;
   if (nuevo.comentario?.trim()) payload.comentario = nuevo.comentario.trim();
 
-  // Si se adjuntó una foto local (file://, content://, data:), primero la subimos a POST /archivos
   if (nuevo.fotoUri) {
     if (
       nuevo.fotoUri.startsWith("file:") ||
@@ -246,10 +217,8 @@ export const crearReporte = async (nuevo: {
         }
       } catch (err) {
         if (esErrorDeConexion(err)) {
-          // Si estamos sin internet, se encolará el reporte en el bloque catch principal
           throw err;
         }
-        // Si falló la subida por otro motivo, enviamos el reporte sin foto para no bloquear al pasajero
         console.warn("No se pudo subir la foto adjunta, se enviará el reporte de texto:", err);
       }
     } else if (
@@ -268,7 +237,6 @@ export const crearReporte = async (nuevo: {
     return res;
   } catch (error) {
     if (esErrorDeConexion(error)) {
-      // Guardar en cola local offline (incluyendo la URI local de la foto en el dispositivo)
       await encolarReporteOffline({
         id: reporteId,
         lineaId: nuevo.lineaId,
@@ -299,9 +267,6 @@ export const crearReporte = async (nuevo: {
   }
 };
 
-/**
- * Sincroniza los reportes pendientes almacenados en SQLite enviándolos a la API.
- */
 export async function sincronizarReportesOffline(): Promise<{
   sincronizados: number;
   fallidos: number;
@@ -322,7 +287,6 @@ export async function sincronizarReportesOffline(): Promise<{
             fotoUrlRemota = resArchivo.datos.url;
           }
         } catch {
-          // Si la foto local ya no existe, enviamos igual el reporte
         }
       }
 
@@ -352,12 +316,7 @@ export async function sincronizarReportesOffline(): Promise<{
   return { sincronizados, fallidos };
 }
 
-/**
- * Inicia la escucha automática de estado de red con expo-network para reenviar
- * reportes pendientes en cuanto se recupera la conexión a internet.
- */
 export function iniciarEscuchaRedYSincronizacion(): () => void {
-  // Intentar sincronizar al arrancar por si quedaron reportes previos
   sincronizarReportesOffline().catch(() => {});
 
   const sub = Network.addNetworkStateListener((state) => {
@@ -373,9 +332,6 @@ export function iniciarEscuchaRedYSincronizacion(): () => void {
   };
 }
 
-/**
- * Calcula un texto legible del tiempo transcurrido (ej: "hace 15 min").
- */
 export function formatearTiempoTranscurrido(fechaIso: string): string {
   const ahora = Date.now();
   const fecha = new Date(fechaIso).getTime();

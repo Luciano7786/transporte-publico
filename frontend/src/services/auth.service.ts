@@ -60,15 +60,9 @@ async function guardarCuentaLocal(nueva: CuentaLocal): Promise<void> {
     filtradas.push(nueva);
     await Storage.setItem(CLAVE_CUENTAS_LOCALES, JSON.stringify(filtradas));
   } catch {
-    // Ignorar error de persistencia secundaria
   }
 }
 
-/**
- * Inicia sesión con email y contraseña.
- * Si el backend no está desplegado o no hay conexión, autentica contra el catálogo local
- * de cuentas registradas y cuentas semilla para que el APK funcione 100% autónomo.
- */
 export const iniciarSesionServicio = async (
   email: string,
   contrasenia: string,
@@ -119,11 +113,6 @@ export const iniciarSesionServicio = async (
   }
 };
 
-/**
- * Registra un nuevo usuario pasajero.
- * Si el backend no está disponible (modo APK autónomo), crea y persiste la cuenta localmente
- * en el dispositivo para que la sesión y el reingreso biométrico funcionen sin servidor.
- */
 export const registrarseServicio = async (
   nombre: string,
   email: string,
@@ -191,15 +180,9 @@ export const registrarseServicio = async (
   }
 };
 
-/**
- * Obtiene el perfil del usuario autenticado actual.
- */
 export const obtenerPerfilServicio = (): Promise<RespuestaExitosa<Usuario>> =>
   clienteHttp<Usuario>("/yo");
 
-/**
- * Modifica preferencias del usuario (nombre, tema, avisosActivos).
- */
 export const actualizarPerfilServicio = (cambios: {
   nombre?: string;
   tema?: "claro" | "oscuro" | "sistema";
@@ -210,9 +193,6 @@ export const actualizarPerfilServicio = (cambios: {
     body: JSON.stringify(cambios),
   });
 
-/**
- * Agrega una línea a los favoritos del usuario.
- */
 export const agregarLineaFavoritaServicio = (
   lineaId: string,
 ): Promise<RespuestaExitosa<Usuario>> =>
@@ -220,9 +200,6 @@ export const agregarLineaFavoritaServicio = (
     method: "PUT",
   });
 
-/**
- * Elimina una línea de los favoritos del usuario.
- */
 export const eliminarLineaFavoritaServicio = (
   lineaId: string,
 ): Promise<RespuestaExitosa<void>> =>
@@ -230,9 +207,6 @@ export const eliminarLineaFavoritaServicio = (
     method: "DELETE",
   });
 
-/**
- * Agrega una parada a los favoritos del usuario.
- */
 export const agregarParadaFavoritaServicio = (
   paradaId: string,
 ): Promise<RespuestaExitosa<Usuario>> =>
@@ -240,9 +214,6 @@ export const agregarParadaFavoritaServicio = (
     method: "PUT",
   });
 
-/**
- * Elimina una parada de los favoritos del usuario.
- */
 export const eliminarParadaFavoritaServicio = (
   paradaId: string,
 ): Promise<RespuestaExitosa<void>> =>

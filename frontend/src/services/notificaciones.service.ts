@@ -7,15 +7,12 @@ import { clienteHttp } from "./cliente";
 
 const CLAVE_AVISOS_NOTIFICADOS = "notificaciones.avisos_vistos_ids";
 
-// Silenciamos el aviso informativo de Expo Go SDK 53+ sobre notificaciones push remotas,
-// ya que en Expo Go utilizamos las notificaciones locales ("Avisame 10 min antes").
 LogBox.ignoreLogs([
   "expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go",
   "`expo-notifications` functionality is not fully supported in Expo Go",
   "[expo-notifications] Push notifications (remote notifications) are unavailable in Expo Go",
 ]);
 
-// Configuramos cómo se presentan las notificaciones cuando la app está abierta en primer plano
 try {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -26,12 +23,8 @@ try {
     }),
   });
 } catch {
-  // En entorno web o emulador sin soporte nativo de handler, continuamos sin lanzar error
 }
 
-/**
- * Solicita permisos de notificaciones locales/push mediante expo-notifications.
- */
 export async function solicitarPermisoNotificaciones(): Promise<boolean> {
   if (Platform.OS === "web") return false;
   try {
@@ -45,11 +38,6 @@ export async function solicitarPermisoNotificaciones(): Promise<boolean> {
   }
 }
 
-/**
- * Programa una notificación local con expo-notifications para avisar al pasajero
- * 10 minutos antes de que pase el colectivo por la parada.
- * Devuelve el identificador de la notificación programada (o null si se usa fallback).
- */
 export async function programarRecordatorioColectivo(params: {
   numeroLinea: string;
   horaColectivo: string;
@@ -86,9 +74,6 @@ export async function programarRecordatorioColectivo(params: {
   }
 }
 
-/**
- * Cancela un recordatorio previamente programado en expo-notifications.
- */
 export async function cancelarRecordatorioColectivo(
   notificacionId: string | null | undefined,
 ): Promise<void> {
@@ -96,18 +81,11 @@ export async function cancelarRecordatorioColectivo(
   try {
     await Notifications.cancelScheduledNotificationAsync(notificacionId);
   } catch {
-    // Si ya se disparó o no existe, ignoramos silenciosamente
   }
 }
 
-/**
- * Obtiene el token de Expo Push del dispositivo y lo registra en POST /api/v1/dispositivos
- * cuando el usuario tiene sesión iniciada.
- */
 export async function registrarDispositivoPushEnServidor(): Promise<string | null> {
   if (Platform.OS === "web") return null;
-  // En Expo Go sobre Android (SDK 53+), getExpoPushTokenAsync no está disponible (solo notificaciones locales),
-  // por lo que evitamos invocarlo en ese entorno para no disparar el warning en consola.
   if (Platform.OS === "android" && isRunningInExpoGo()) {
     return null;
   }
@@ -131,10 +109,6 @@ export async function registrarDispositivoPushEnServidor(): Promise<string | nul
   }
 }
 
-/**
- * Verifica si existen avisos vigentes nuevos que afecten a alguna de las líneas favoritas
- * del pasajero y dispara una notificación local inmediata (solo una vez por aviso).
- */
 export async function notificarNuevosAvisosEnLineasFavoritas(
   avisos: Aviso[],
   lineasFavoritas: string[],
@@ -198,8 +172,6 @@ export async function notificarNuevosAvisosEnLineasFavoritas(
       JSON.stringify(idsYaNotificados),
     );
   } catch {
-    // Ignorar errores silenciosamente para no interrumpir la carga
   }
 }
-
 

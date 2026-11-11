@@ -61,7 +61,6 @@ export function PerfilScreen() {
           }
         }
       } catch {
-        // Fallback silencioso
       }
     }
     cargarCatalogos();
@@ -138,7 +137,6 @@ export function PerfilScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 1. Tarjeta de Cuenta / Sesión */}
         <View
           style={[
             styles.card,
@@ -243,7 +241,6 @@ export function PerfilScreen() {
           )}
         </View>
 
-        {/* 2. Selector de Apariencia / Tema (Claro / Oscuro / Sistema) */}
         <View
           style={[
             styles.card,
@@ -308,7 +305,6 @@ export function PerfilScreen() {
           </View>
         </View>
 
-        {/* 3. Notificaciones y Seguridad Biométrica */}
         <View
           style={[
             styles.card,
@@ -368,7 +364,6 @@ export function PerfilScreen() {
           </View>
         </View>
 
-        {/* 4. Mis Líneas Favoritas */}
         <View
           style={[
             styles.card,
@@ -433,7 +428,6 @@ export function PerfilScreen() {
           )}
         </View>
 
-        {/* 5. Mis Paradas Favoritas */}
         <View
           style={[
             styles.card,

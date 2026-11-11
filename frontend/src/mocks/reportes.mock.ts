@@ -2,7 +2,6 @@ import { delay } from "../helper/delay";
 import type { MotivoDemora, ReporteDeDemora, RespuestaApi } from "../types";
 import { mockConfig } from "./lineas.mock";
 
-// Fechas relativas a "ahora"
 const minutosAtras = (minutos: number) =>
   new Date(Date.now() - minutos * 60 * 1000).toISOString();
 

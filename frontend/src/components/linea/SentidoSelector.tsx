@@ -22,7 +22,6 @@ export const SentidoSelector: React.FC<SentidoSelectorProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Botón Ida */}
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => onChange("ida")}
@@ -53,7 +52,6 @@ export const SentidoSelector: React.FC<SentidoSelectorProps> = ({
         </Text>
       </TouchableOpacity>
 
-      {/* Botón Vuelta */}
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => onChange("vuelta")}

@@ -30,7 +30,6 @@ export const AvisoCard: React.FC<AvisoCardProps> = ({
         ? "Informativo"
         : "Suspensión";
 
-  // Obtenemos los objetos de línea afectados para pintar sus números y colores exactos
   const lineasAfectadas = aviso.lineaIds.map((id) => {
     const lObj = lineas.find((l) => l.id === id);
     const num = id.replace("lin-0", "").replace("lin-", "");
@@ -61,7 +60,6 @@ export const AvisoCard: React.FC<AvisoCardProps> = ({
         },
       ]}
     >
-      {/* Encabezado: Etiqueta de gravedad y rango de fechas */}
       <View style={styles.headerRow}>
         <Text style={[styles.gravedadTexto, { color: estiloGravedad.texto }]}>
           {etiquetaGravedad}
@@ -71,12 +69,10 @@ export const AvisoCard: React.FC<AvisoCardProps> = ({
         </Text>
       </View>
 
-      {/* Título del aviso */}
       <Text style={[styles.titulo, { color: paleta.textoAlto }]}>
         {aviso.titulo}
       </Text>
 
-      {/* Badges de las líneas afectadas */}
       <View style={styles.lineasRow}>
         {lineasAfectadas.map((l) => (
           <View key={l.id} style={[styles.lineaBadge, { backgroundColor: l.color }]}>
@@ -85,14 +81,12 @@ export const AvisoCard: React.FC<AvisoCardProps> = ({
         ))}
       </View>
 
-      {/* Detalle descriptivo */}
       {aviso.detalle ? (
         <Text style={[styles.detalle, { color: paleta.textoMedio }]}>
           {aviso.detalle}
         </Text>
       ) : null}
 
-      {/* Botón de reproducción de Video corto */}
       {aviso.videoUrl ? (
         <TouchableOpacity
           activeOpacity={0.8}
@@ -112,7 +106,6 @@ export const AvisoCard: React.FC<AvisoCardProps> = ({
         </TouchableOpacity>
       ) : null}
 
-      {/* Botón para ver recorrido en el mapa */}
       {aviso.trazadoAlternativo ? (
         <TouchableOpacity
           activeOpacity={0.8}

@@ -1,4 +1,3 @@
-// src/db/database.ts
 import * as SQLite from "expo-sqlite";
 import { Platform } from "react-native";
 import { LINEAS_MOCK } from "../mocks/lineas.mock";
@@ -12,11 +11,6 @@ let dbInstance: SQLite.SQLiteDatabase | null = null;
 let inicializacionPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 let colaEscrituraPromise: Promise<void> = Promise.resolve();
 
-/**
- * Encola operaciones de escritura en SQLite de forma secuencial para evitar
- * colisiones de transacciones concurrentes ("cannot start a transaction within a transaction")
- * cuando múltiples pantallas actualizan el caché al mismo tiempo.
- */
 function ejecutarEscrituraSecuencial(tarea: () => Promise<void>): Promise<void> {
   const siguiente = colaEscrituraPromise.then(tarea, tarea);
   colaEscrituraPromise = siguiente.catch(() => {});
@@ -31,16 +25,11 @@ export interface ReporteOfflineLocal {
   comentario: string | null;
   fotoUri: string | null;
   fechaHora: string;
-  sincronizado: number; // 0 = pendiente, 1 = enviado
+  sincronizado: number;
 }
 
-/**
- * Obtiene la instancia abierta de la base de datos SQLite (patrón Singleton).
- */
 export async function obtenerBaseDeDatos(): Promise<SQLite.SQLiteDatabase | null> {
   if (Platform.OS === "web") {
-    // SQLite en entorno web de Expo requiere configuración de headers OPFS adicionales.
-    // Devolvemos null de forma segura para no romper la app en navegador.
     return null;
   }
 
@@ -60,11 +49,7 @@ export async function obtenerBaseDeDatos(): Promise<SQLite.SQLiteDatabase | null
   return inicializacionPromise;
 }
 
-/**
- * Crea las tablas locales requeridas por la cátedra (DDL especificado en el informe técnico).
- */
 async function inicializarTablas(db: SQLite.SQLiteDatabase): Promise<void> {
-  // 1. DDL según Sección 4 del Informe Técnico
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
 
@@ -108,14 +93,11 @@ async function inicializarTablas(db: SQLite.SQLiteDatabase): Promise<void> {
     );
   `);
 
-  // Migración suave por si la tabla cola_reportes_offline fue creada antes sin la columna fotoUri
   try {
     await db.execAsync("ALTER TABLE cola_reportes_offline ADD COLUMN fotoUri TEXT;");
   } catch {
-    // La columna ya existe
   }
 
-  // 2. Poblado inicial con datos semilla si la base está recién creada
   try {
     const cantParadas = await db.getFirstAsync<{ cantidad: number }>(
       "SELECT COUNT(*) AS cantidad FROM cache_paradas;",
@@ -178,9 +160,6 @@ async function inicializarTablas(db: SQLite.SQLiteDatabase): Promise<void> {
   }
 }
 
-/**
- * Inicializa de forma explícita la base de datos (por ejemplo, en el arranque de la app).
- */
 export async function inicializarBaseDeDatos(): Promise<void> {
   try {
     await obtenerBaseDeDatos();
@@ -189,13 +168,6 @@ export async function inicializarBaseDeDatos(): Promise<void> {
   }
 }
 
-// ============================================================================
-// 1. CACHÉ DE LÍNEAS (cache_lineas)
-// ============================================================================
-
-/**
- * Guarda o actualiza un lote de líneas en la tabla cache_lineas.
- */
 export async function guardarLineasEnCache(lineas: Linea[]): Promise<void> {
   const db = await obtenerBaseDeDatos();
   if (!db || lineas.length === 0) return;
@@ -219,9 +191,6 @@ export async function guardarLineasEnCache(lineas: Linea[]): Promise<void> {
   });
 }
 
-/**
- * Lee todas las líneas almacenadas en cache_lineas.
- */
 export async function obtenerLineasDeCache(): Promise<Linea[]> {
   const db = await obtenerBaseDeDatos();
   if (!db) return [];
@@ -241,9 +210,6 @@ export async function obtenerLineasDeCache(): Promise<Linea[]> {
     .filter((l): l is Linea => l !== null);
 }
 
-/**
- * Obtiene el detalle de una línea específica por su ID desde el caché local.
- */
 export async function obtenerLineaPorIdDeCache(id: string): Promise<Linea | null> {
   const db = await obtenerBaseDeDatos();
   if (!db) return null;
@@ -262,13 +228,6 @@ export async function obtenerLineaPorIdDeCache(id: string): Promise<Linea | null
   }
 }
 
-// ============================================================================
-// 2. CACHÉ DE PARADAS (cache_paradas)
-// ============================================================================
-
-/**
- * Guarda o actualiza un lote de paradas en la tabla cache_paradas.
- */
 export async function guardarParadasEnCache(paradas: Parada[]): Promise<void> {
   const db = await obtenerBaseDeDatos();
   if (!db || paradas.length === 0) return;
@@ -292,9 +251,6 @@ export async function guardarParadasEnCache(paradas: Parada[]): Promise<void> {
   });
 }
 
-/**
- * Lee todas las paradas almacenadas en cache_paradas.
- */
 export async function obtenerParadasDeCache(): Promise<Parada[]> {
   const db = await obtenerBaseDeDatos();
   if (!db) return [];
@@ -314,9 +270,6 @@ export async function obtenerParadasDeCache(): Promise<Parada[]> {
     .filter((p): p is Parada => p !== null);
 }
 
-/**
- * Obtiene una parada por su ID desde el caché local.
- */
 export async function obtenerParadaPorIdDeCache(id: string): Promise<Parada | null> {
   const db = await obtenerBaseDeDatos();
   if (!db) return null;
@@ -335,14 +288,10 @@ export async function obtenerParadaPorIdDeCache(id: string): Promise<Parada | nu
   }
 }
 
-/**
- * Resuelve una parada a partir de su código QR o ID en caché local.
- */
 export async function obtenerParadaPorQrDeCache(codigoQrOId: string): Promise<Parada | null> {
   const paradas = await obtenerParadasDeCache();
   if (paradas.length === 0) return null;
 
-  // Busca por codigoQr exacto o coincidencia de ID
   const encontrada = paradas.find(
     (p) => p.codigoQr === codigoQrOId || p.id === codigoQrOId,
   );
@@ -350,13 +299,6 @@ export async function obtenerParadaPorQrDeCache(codigoQrOId: string): Promise<Pa
   return encontrada ?? null;
 }
 
-// ============================================================================
-// 3. CACHÉ DE HORARIOS (cache_horarios)
-// ============================================================================
-
-/**
- * Guarda los horarios de una parada para una combinación de línea y sentido.
- */
 export async function guardarHorariosEnCache(
   paradaId: string,
   lineaId: string = "todas",
@@ -375,9 +317,6 @@ export async function guardarHorariosEnCache(
   });
 }
 
-/**
- * Obtiene los horarios cacheados de una parada.
- */
 export async function obtenerHorariosDeCache(
   paradaId: string,
   lineaId: string = "todas",
@@ -401,13 +340,6 @@ export async function obtenerHorariosDeCache(
   }
 }
 
-// ============================================================================
-// 4. COLA DE REPORTES OFFLINE (cola_reportes_offline)
-// ============================================================================
-
-/**
- * Encola un reporte de demora generado sin internet.
- */
 export async function encolarReporteOffline(reporte: {
   id: string;
   lineaId: string;
@@ -435,9 +367,6 @@ export async function encolarReporteOffline(reporte: {
   );
 }
 
-/**
- * Obtiene los reportes que aún no fueron sincronizados (sincronizado = 0).
- */
 export async function obtenerReportesPendientes(): Promise<ReporteOfflineLocal[]> {
   const db = await obtenerBaseDeDatos();
   if (!db) return [];
@@ -447,9 +376,6 @@ export async function obtenerReportesPendientes(): Promise<ReporteOfflineLocal[]
   );
 }
 
-/**
- * Marca un reporte como sincronizado exitosamente.
- */
 export async function marcarReporteSincronizado(id: string): Promise<void> {
   const db = await obtenerBaseDeDatos();
   if (!db) return;
@@ -460,9 +386,6 @@ export async function marcarReporteSincronizado(id: string): Promise<void> {
   );
 }
 
-/**
- * Elimina los reportes que ya fueron sincronizados.
- */
 export async function limpiarReportesSincronizados(): Promise<void> {
   const db = await obtenerBaseDeDatos();
   if (!db) return;

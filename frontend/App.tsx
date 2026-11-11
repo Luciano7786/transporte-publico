@@ -21,7 +21,6 @@ function MainNavigation() {
   const { temaActual, paleta } = useThemeContext();
   const auth = useContext(AuthContext);
 
-  // Si todavía está restaurando la sesión o cargando, retornamos null o un splash
   if (!auth) return null;
 
   return (
@@ -36,14 +35,12 @@ function MainNavigation() {
             animation: "slide_from_right",
           }}
         >
-          {/* Pantallas principales siempre accesibles (modo invitado por defecto) */}
           <Stack.Screen name="EscanearQr" component={EscanerQrScreen} options={{headerShown: false, presentation: 'fullScreenModal'}} />
           <Stack.Screen name="MainTabs" component={TabNavigator} />
           <Stack.Screen name="ParadaDetalle" component={ParadaDetalleScreen} />
           <Stack.Screen name="LineaDetalle" component={LineaDetalleScreen} />
           <Stack.Screen name="ReportarDemora" component={ReportarDemoraScreen} />
           
-          {/* Pantalla de autenticación disponible en el stack para ser llamada cuando se requiera */}
           <Stack.Screen name="Login" component={LoginScreen} />
         </Stack.Navigator>
       </NavigationContainer>

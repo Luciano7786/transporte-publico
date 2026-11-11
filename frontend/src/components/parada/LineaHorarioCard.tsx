@@ -50,7 +50,6 @@ export const LineaHorarioCard: React.FC<LineaHorarioCardProps> = ({
         },
       ]}
     >
-      {/* Si finalizó el servicio: cabecera completa con el color de la línea */}
       {finalizoServicio ? (
         <>
           <View style={[styles.bannerLineaFin, { backgroundColor: color }]}>
@@ -86,7 +85,6 @@ export const LineaHorarioCard: React.FC<LineaHorarioCardProps> = ({
         </>
       ) : (
         <View style={styles.paddingContenido}>
-          {/* Encabezado: Badge de línea y destino */}
           <View style={styles.headerRow}>
             <View style={[styles.badge, { backgroundColor: color }]}>
               <Text style={styles.badgeTexto}>{numero}</Text>
@@ -99,7 +97,6 @@ export const LineaHorarioCard: React.FC<LineaHorarioCardProps> = ({
             </Text>
           </View>
 
-          {/* Horario Principal */}
           <View style={styles.horarioPrincipalRow}>
             <Text
               style={[styles.horarioPrincipal, { color: paleta.textoAlto }]}
@@ -113,7 +110,6 @@ export const LineaHorarioCard: React.FC<LineaHorarioCardProps> = ({
             ) : null}
           </View>
 
-          {/* Horarios siguientes */}
           {siguientes.length > 0 ? (
             <View style={styles.siguientesRow}>
               {siguientes.map((hora, idx) => (
@@ -130,7 +126,6 @@ export const LineaHorarioCard: React.FC<LineaHorarioCardProps> = ({
             </View>
           ) : null}
 
-          {/* Acciones inferiores: Recordatorio 10 min antes y Ver tabla completa */}
           <View
             style={[
               styles.accionesRow,
@@ -194,7 +189,6 @@ export const LineaHorarioCard: React.FC<LineaHorarioCardProps> = ({
         </View>
       )}
 
-      {/* Desplegable con todos los horarios del día seleccionado */}
       {verTablaCompleta && todosLosHorarios.length > 0 ? (
         <View
           style={[

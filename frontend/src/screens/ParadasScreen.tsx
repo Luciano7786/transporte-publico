@@ -49,7 +49,6 @@ export function ParadasScreen() {
     { numero: "14", color: "#B45309", proximos: ["10:51", "11:21", "11:51"] },
   ]);
 
-  // Prioriza las paradas favoritas del usuario; si no tiene ninguna marcada, usa la más cercana
   const paradaDestacada = useMemo(() => {
     if (paradas.length === 0) return null;
 
@@ -78,7 +77,6 @@ export function ParadasScreen() {
     };
   }, [paradas, usuarioCoords, auth?.paradasFavoritas]);
 
-  // Filtra las paradas en tiempo real por nombre o calle (funciona incluso sin permiso de GPS)
   const paradasFiltradas = useMemo(() => {
     const termino = busqueda.trim().toLowerCase();
     if (!termino) return [];
@@ -133,7 +131,6 @@ export function ParadasScreen() {
     };
   }, []);
 
-  // Actualiza los próximos horarios de la parada destacada (favorita o más cercana) usando la hora real del sistema
   useEffect(() => {
     let activo = true;
     const paradaObjetivo = paradaDestacada?.parada;
@@ -153,7 +150,6 @@ export function ParadasScreen() {
           const color =
             lineaInfo?.color ?? (lId === "lin-05" ? "#1B6CA8" : "#B45309");
 
-          // Calcula con la hora real del dispositivo; si ya terminó el servicio hoy, muestra los primeros de mañana
           const calc = calcularProximosHorarios(
             resHorarios.datos,
             lId,
@@ -224,7 +220,6 @@ export function ParadasScreen() {
     >
       <InicioHeader titulo="Paraná" onPressQr={handleQrPress} />
 
-      {/* Buscador de paradas por nombre o por calle */}
       <View style={styles.searchWrapper}>
         <View
           style={[
@@ -255,7 +250,6 @@ export function ParadasScreen() {
         </View>
       </View>
 
-      {/* Si el usuario está buscando por nombre/calle, mostramos resultados directos */}
       {busqueda.trim().length > 0 ? (
         <View style={styles.resultadosContainer}>
           <FlatList

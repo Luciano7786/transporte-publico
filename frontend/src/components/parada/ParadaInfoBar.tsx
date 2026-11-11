@@ -37,7 +37,6 @@ export const ParadaInfoBar: React.FC<ParadaInfoBarProps> = ({
   const { paleta } = useThemeContext();
   const [rumboDispositivo, setRumboDispositivo] = useState<number>(0);
 
-  // Escucha de brújula / magnetómetro del dispositivo mediante expo-sensors (y expo-location como respaldo)
   useEffect(() => {
     let subMagnetometro: { remove: () => void } | null = null;
     let subHeading: Location.LocationSubscription | null = null;
@@ -65,7 +64,6 @@ export const ParadaInfoBar: React.FC<ParadaInfoBarProps> = ({
           }
         }
 
-        // Respaldo con Location.watchHeadingAsync si el magnetómetro directo no está activo
         const { status } = await Location.getForegroundPermissionsAsync();
         if (status !== "granted" || cancelado) return;
 
@@ -81,7 +79,6 @@ export const ParadaInfoBar: React.FC<ParadaInfoBarProps> = ({
           }
         });
       } catch {
-        // En emuladores o web sin magnetómetro usamos rumbo norte (0°)
       }
     }
 
@@ -94,7 +91,6 @@ export const ParadaInfoBar: React.FC<ParadaInfoBarProps> = ({
     };
   }, []);
 
-  // Ángulo geográfico hacia la parada respecto a la posición del pasajero
   const rumboParada = calcularRumboGrados(usuarioCoordenadas, coordenadas);
   const rotacionFlecha = Math.round((rumboParada - rumboDispositivo + 360) % 360);
   const puntoCardinal = obtenerPuntoCardinal(rumboParada);
@@ -128,7 +124,6 @@ export const ParadaInfoBar: React.FC<ParadaInfoBarProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Pill con flecha de orientación dinámica hacia la parada y distancia */}
       <View style={styles.pill}>
         <Ionicons
           name="arrow-up-outline"
@@ -141,7 +136,6 @@ export const ParadaInfoBar: React.FC<ParadaInfoBarProps> = ({
         </Text>
       </View>
 
-      {/* Enlace Cómo llegar */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={handleComoLlegar}

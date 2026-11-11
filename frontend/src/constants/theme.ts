@@ -7,33 +7,26 @@ export type ColorKeys = {
 }[keyof Paleta];
 
 export interface Paleta {
-  // Fondos y superficies
   fondoApp: string;
-  superficie1: string; // cards, barra de tabs
-  superficie2: string; // chips, inputs, mapa
-  superficie3: string; // etiquetas sobre imagen
+  superficie1: string;
+  superficie2: string;
+  superficie3: string;
   borde: string;
 
-  // Texto e íconos
-  textoAlto: string; // texto principal
-  textoMedio: string; // texto secundario
-  textoBajo: string; // texto terciario / deshabilitado
+  textoAlto: string;
+  textoMedio: string;
+  textoBajo: string;
 
-  // Acento: botón primario, chip y tab activos, enlaces
   acento: string;
-  textoSobreAcento: string; // texto sobre un fondo de acento sólido
+  textoSobreAcento: string;
 
-  // Estados (banners, insignias de "funcionando normal", errores)
   exito: string;
   advertencia: string;
   error: string;
   informacion: string;
 
-  // Fijo (no cambia entre temas). El color de fondo de la insignia de cada
-  // línea viene de la API (Linea.color); el número va siempre en blanco.
   textoSobreLinea: string;
 
-  // Colores de los tres tipos de aviso. Mismo shape para los dos temas.
   gravedadAviso: Record<Gravedad, { fondo: string; borde: string; texto: string }>;
 }
 
@@ -121,13 +114,9 @@ export const Colors: Record<"light" | "dark", Paleta> = {
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: "system-ui",
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: "ui-serif",
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: "ui-rounded",
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: "ui-monospace",
   },
   default: {

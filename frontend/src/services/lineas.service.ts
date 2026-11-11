@@ -12,9 +12,6 @@ import { ErrorApi } from "./error.service";
 const CLAVE_CACHE_AVISOS = "cache.avisos.lista";
 const CLAVE_CACHE_AVISOS_FECHA = "cache.avisos.fecha_iso";
 
-/**
- * Determina si debemos usar el caché local de respaldo ante un fallo de red o del túnel.
- */
 function esErrorResiliente(error: unknown): boolean {
   if (!(error instanceof ErrorApi)) return false;
   return (
@@ -25,11 +22,6 @@ function esErrorResiliente(error: unknown): boolean {
   );
 }
 
-/**
- * Obtiene todas las líneas de transporte urbano de Paraná.
- * Estrategia de Resiliencia: si la red responde, refresca el caché SQLite;
- * si falla por SIN_CONEXION, devuelve los datos almacenados en SQLite.
- */
 export const obtenerLineas = async (): Promise<RespuestaExitosa<Linea[]>> => {
   try {
     const res = await clienteHttp<Linea[]>("/lineas");
@@ -57,10 +49,6 @@ export const obtenerLineas = async (): Promise<RespuestaExitosa<Linea[]>> => {
   }
 };
 
-/**
- * Obtiene el detalle de una línea por su ID (ej: "lin-05").
- * Ante pérdida de conectividad, intenta resolverla desde la tabla local cache_lineas.
- */
 export const obtenerLineaPorId = async (
   id: string,
 ): Promise<RespuestaExitosa<Linea>> => {
@@ -78,11 +66,6 @@ export const obtenerLineaPorId = async (
   }
 };
 
-/**
- * Obtiene la lista de avisos del sistema (vigentes por defecto).
- * Estrategia de Resiliencia: guarda los avisos y la fecha de actualización en caché local;
- * si no hay señal, devuelve los avisos cacheados (o los datos semilla) e informa desdeCache = true.
- */
 export const obtenerAvisos = async (
   estado: "vigentes" | "proximos" | "todos" = "vigentes",
   lineaId?: string,
@@ -113,7 +96,6 @@ export const obtenerAvisos = async (
           }
         }
       } catch {
-        // Mantiene AVISOS_MOCK como respaldo
       }
 
       if (lineaId) {
@@ -134,9 +116,6 @@ export const obtenerAvisos = async (
   }
 };
 
-/**
- * Obtiene la fecha ISO de la última actualización exitosa de avisos.
- */
 export async function obtenerUltimaActualizacionAvisos(): Promise<string | null> {
   try {
     return await Storage.getItem(CLAVE_CACHE_AVISOS_FECHA);
@@ -145,9 +124,6 @@ export async function obtenerUltimaActualizacionAvisos(): Promise<string | null>
   }
 }
 
-/**
- * Retorna el aviso vigente (desvío o alerta) para una línea dada.
- */
 export async function obtenerAvisoVigentePorLinea(
   lineaId: string,
 ): Promise<Aviso | null> {
@@ -155,7 +131,6 @@ export async function obtenerAvisoVigentePorLinea(
     const res = await obtenerAvisos("vigentes", lineaId);
     if (!res.datos || res.datos.length === 0) return null;
 
-    // Priorizamos desvíos sobre informativos
     const desvio = res.datos.find((a) => a.gravedad === "desvio");
     return desvio ?? res.datos[0] ?? null;
   } catch {
