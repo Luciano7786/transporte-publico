@@ -43,7 +43,6 @@ export const ParadasTimeline: React.FC<ParadasTimelineProps> = ({
             onPress={() => onSelectParada?.(item.id)}
             style={styles.itemRow}
           >
-            {/* Columna con línea vertical y círculo */}
             <View style={styles.timelineColumn}>
               <View
                 style={[
@@ -76,7 +75,6 @@ export const ParadasTimeline: React.FC<ParadasTimelineProps> = ({
               )}
             </View>
 
-            {/* Texto de la parada y su estado */}
             <View style={styles.infoColumn}>
               <View style={styles.nombreRow}>
                 <Text

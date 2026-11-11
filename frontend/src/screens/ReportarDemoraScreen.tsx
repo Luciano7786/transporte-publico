@@ -1,10 +1,14 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,11 +18,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useThemeContext } from "../hooks/use-theme-context";
-import { apiService } from "../services/api";
 import { obtenerLineas } from "../services/lineas.service";
 import { obtenerParadaPorId } from "../services/paradas.service";
-import { crearReporte } from "../services/reportes.service";
-import type { Linea, MotivoDemora } from "../types";
+import {
+  crearReporte,
+  guardarFotoReporteEnDispositivo,
+} from "../services/reportes.service";
+import type { Linea, MotivoDemora, Parada } from "../types";
 
 export function ReportarDemoraScreen() {
   const navigation = useNavigation<any>();
@@ -26,12 +32,12 @@ export function ReportarDemoraScreen() {
   const { paleta } = useThemeContext();
 
   const paradaId = route.params?.paradaId ?? "par-101";
-  const nombreParada = route.params?.nombreParada ?? "Alameda y Urquiza";
+  const nombreParadaInicial = route.params?.nombreParada ?? "Alameda y Urquiza";
   const idsLineaIniciales: string[] = Array.isArray(route.params?.lineaIds)
     ? route.params.lineaIds
     : [];
 
-  // Estados del formulario
+  const [parada, setParada] = useState<Parada | null>(null);
   const [lineaIds, setLineaIds] = useState<string[]>(idsLineaIniciales);
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [cargandoLineas, setCargandoLineas] = useState(true);
@@ -42,9 +48,12 @@ export function ReportarDemoraScreen() {
   const [motivoSeleccionado, setMotivoSeleccionado] =
     useState<MotivoDemora>("no_paso");
   const [comentario, setComentario] = useState<string>("");
-  const [fotoSeleccionada, setFotoSeleccionada] =
-    useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [fotoUri, setFotoUri] = useState<string | null>(null);
   const [enviando, setEnviando] = useState<boolean>(false);
+  const [permisoCamara, solicitarPermisoCamara] = useCameraPermissions();
+  const [camaraVisible, setCamaraVisible] = useState<boolean>(false);
+  const [capturandoFoto, setCapturandoFoto] = useState<boolean>(false);
+  const cameraRef = useRef<CameraView>(null);
 
   useEffect(() => {
     let activo = true;
@@ -61,7 +70,14 @@ export function ReportarDemoraScreen() {
 
       const problemas: string[] = [];
       if (resultadoParada.status === "fulfilled") {
-        setLineaIds(resultadoParada.value.datos.lineaIds);
+        const datosParada = resultadoParada.value.datos;
+        setParada(datosParada);
+        setLineaIds(datosParada.lineaIds);
+        setLineaSeleccionada((actual) =>
+          datosParada.lineaIds.includes(actual)
+            ? actual
+            : datosParada.lineaIds[0] ?? "",
+        );
       } else {
         console.warn("No se pudieron cargar las líneas de la parada:", resultadoParada.reason);
         problemas.push("No se pudo actualizar la información de la parada.");
@@ -81,25 +97,26 @@ export function ReportarDemoraScreen() {
       setErrorLineas(problemas.length > 0 ? problemas.join(" ") : null);
       setCargandoLineas(false);
     }
-
     cargarLineasDeParada();
     return () => {
       activo = false;
     };
   }, [paradaId]);
 
-  useEffect(() => {
-    if (!lineaIds.includes(lineaSeleccionada)) {
-      setLineaSeleccionada(lineaIds[0] ?? "");
-    }
-  }, [lineaIds, lineaSeleccionada]);
+  const nombreParada = parada?.nombre ?? nombreParadaInicial;
 
   const lineasDisponibles = lineaIds.map((id) => {
     const linea = lineas.find((item) => item.id === id);
     return {
       id,
       numero: linea?.numero ?? id.replace(/^lin-0?/, ""),
-      color: linea?.color ?? paleta.acento,
+      color:
+        linea?.color ??
+        (id === "lin-05"
+          ? "#1B6CA8"
+          : id === "lin-14"
+            ? "#B45309"
+            : paleta.acento),
     };
   });
 
@@ -111,42 +128,76 @@ export function ReportarDemoraScreen() {
     { id: "calle_cortada", label: "Calle cortada" },
   ];
 
-  const seleccionarFoto = async (origen: "camara" | "galeria") => {
+  const handleSacarFoto = async () => {
     try {
-      if (origen === "camara") {
-        const permiso = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permisoCamara?.granted) {
+        const permiso = await solicitarPermisoCamara();
         if (!permiso.granted) {
           Alert.alert(
             "Permiso requerido",
-            "Habilitá el acceso a la cámara para tomar una foto.",
+            "Necesitamos permiso para usar la cámara y adjuntar la foto del estado de la parada o unidad.",
           );
           return;
         }
       }
+      setCamaraVisible(true);
+    } catch {
+      Alert.alert("Cámara", "No se pudo abrir la cámara en este dispositivo.");
+    }
+  };
 
-      const resultado =
-        origen === "camara"
-          ? await ImagePicker.launchCameraAsync({
-              mediaTypes: ["images"],
-              allowsEditing: true,
-              quality: 0.8,
-            })
-          : await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ["images"],
-              allowsEditing: true,
-              quality: 0.8,
-            });
+  const handleCapturarFotoCamara = async () => {
+    if (!cameraRef.current || capturandoFoto) return;
+    try {
+      setCapturandoFoto(true);
+      const foto = await cameraRef.current.takePictureAsync({
+        quality: 0.7,
+      });
+      if (foto?.uri) {
+        const uriGuardada = guardarFotoReporteEnDispositivo(foto.uri);
+        setFotoUri(uriGuardada);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }
+      setCamaraVisible(false);
+    } catch {
+      Alert.alert(
+        "Cámara",
+        "No se pudo capturar la imagen. Intentá nuevamente.",
+      );
+    } finally {
+      setCapturandoFoto(false);
+    }
+  };
 
-      if (!resultado.canceled && resultado.assets[0]) {
-        setFotoSeleccionada(resultado.assets[0]);
+  const handleGaleria = async () => {
+    try {
+      const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permiso.granted) {
+        Alert.alert(
+          "Permiso requerido",
+          "Necesitamos acceso a tu galería para seleccionar una foto de la parada o unidad.",
+        );
+        return;
+      }
+
+      const resultado = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.75,
+      });
+
+      if (!resultado.canceled && resultado.assets && resultado.assets[0]?.uri) {
+        const uriGuardada = guardarFotoReporteEnDispositivo(
+          resultado.assets[0].uri,
+        );
+        setFotoUri(uriGuardada);
+        Haptics.selectionAsync().catch(() => {});
       }
     } catch (error) {
-      console.warn("No se pudo abrir la cámara o galería:", error);
+      console.warn("No se pudo abrir la galería:", error);
       Alert.alert(
-        "No se pudo seleccionar la foto",
-        error instanceof Error
-          ? error.message
-          : "Volvé a intentarlo desde la cámara o galería.",
+        "Galería",
+        "No se pudo abrir la galería de imágenes en este dispositivo.",
       );
     }
   };
@@ -159,16 +210,6 @@ export function ReportarDemoraScreen() {
 
     try {
       setEnviando(true);
-      let fotoUri: string | null = null;
-      if (fotoSeleccionada) {
-        const archivo = await apiService.subirArchivo({
-          uri: fotoSeleccionada.uri,
-          name: fotoSeleccionada.fileName ?? `reporte-${Date.now()}.jpg`,
-          type: fotoSeleccionada.mimeType ?? "image/jpeg",
-        });
-        fotoUri = archivo.url;
-      }
-
       const res = await crearReporte({
         lineaId: lineaSeleccionada,
         paradaId,
@@ -177,6 +218,9 @@ export function ReportarDemoraScreen() {
         fotoUri,
       });
 
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => {},
+      );
       const esOffline = res.datos && !res.datos.sincronizado;
 
       Alert.alert(
@@ -187,7 +231,13 @@ export function ReportarDemoraScreen() {
         [
           {
             text: "Aceptar",
-            onPress: () => navigation.goBack(),
+            onPress: () => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate("MainTabs");
+              }
+            },
           },
         ],
       );
@@ -195,7 +245,7 @@ export function ReportarDemoraScreen() {
       Alert.alert(
         "No se pudo enviar",
         `${err instanceof Error ? err.message : "Ocurrió un error inesperado."}${
-          fotoSeleccionada
+          fotoUri
             ? "\n\nLa foto sigue adjunta. Verificá la conexión o quitá la foto para guardar el reporte sin conexión."
             : ""
         }`,
@@ -209,7 +259,6 @@ export function ReportarDemoraScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: paleta.fondoApp }]}
     >
-      {/* 1. Header */}
       <View style={styles.header}>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -235,7 +284,6 @@ export function ReportarDemoraScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 2. Subtítulo y selector de línea */}
         <Text style={[styles.subtitulo, { color: paleta.textoMedio }]}>
           Desde {nombreParada} · ¿qué línea?
         </Text>
@@ -291,7 +339,6 @@ export function ReportarDemoraScreen() {
           </Text>
         )}
 
-        {/* 3. Lista de Motivos con Radio Buttons */}
         <View style={styles.motivosContainer}>
           {opcionesMotivo.map((opcion) => {
             const isSelected = motivoSeleccionado === opcion.id;
@@ -309,7 +356,6 @@ export function ReportarDemoraScreen() {
                   },
                 ]}
               >
-                {/* Radio Button */}
                 <View
                   style={[
                     styles.radioCircle,
@@ -330,7 +376,6 @@ export function ReportarDemoraScreen() {
                   )}
                 </View>
 
-                {/* Texto del motivo */}
                 <Text
                   style={[
                     styles.motivoTexto,
@@ -346,7 +391,6 @@ export function ReportarDemoraScreen() {
           })}
         </View>
 
-        {/* 4. Campo de Comentario Opcional */}
         <TextInput
           value={comentario}
           onChangeText={setComentario}
@@ -362,11 +406,10 @@ export function ReportarDemoraScreen() {
           ]}
         />
 
-        {/* 5. Acciones de Foto */}
         <View style={styles.fotoBotonesRow}>
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => seleccionarFoto("camara")}
+            onPress={handleSacarFoto}
             disabled={enviando}
             style={[
               styles.fotoBoton,
@@ -383,7 +426,7 @@ export function ReportarDemoraScreen() {
 
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => seleccionarFoto("galeria")}
+            onPress={handleGaleria}
             disabled={enviando}
             style={[
               styles.fotoBoton,
@@ -399,15 +442,14 @@ export function ReportarDemoraScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Vista previa de foto adjunta si existe */}
-        {fotoSeleccionada && (
+        {fotoUri && (
           <View style={styles.fotoPreviewContainer}>
             <Image
-              source={{ uri: fotoSeleccionada.uri }}
+              source={{ uri: fotoUri }}
               style={styles.fotoThumbnail}
             />
             <TouchableOpacity
-              onPress={() => setFotoSeleccionada(null)}
+              onPress={() => setFotoUri(null)}
               disabled={enviando}
               style={styles.eliminarFotoBtn}
             >
@@ -420,7 +462,6 @@ export function ReportarDemoraScreen() {
         )}
       </ScrollView>
 
-      {/* 6. Botón Inferior: Enviar reporte */}
       <View
         style={[
           styles.footer,
@@ -457,6 +498,46 @@ export function ReportarDemoraScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={camaraVisible}
+        animationType="slide"
+        onRequestClose={() => setCamaraVisible(false)}
+      >
+        <View style={styles.cameraModalContainer}>
+          <CameraView
+            ref={cameraRef}
+            style={styles.cameraPreview}
+            facing="back"
+          />
+
+          <View style={styles.cameraTopBar}>
+            <TouchableOpacity
+              onPress={() => setCamaraVisible(false)}
+              style={styles.cameraCloseBtn}
+            >
+              <Ionicons name="close" size={26} color="#ffffff" />
+            </TouchableOpacity>
+            <Text style={styles.cameraTitle}>Foto de la parada / unidad</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <View style={styles.cameraBottomBar}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleCapturarFotoCamara}
+              disabled={capturandoFoto}
+              style={styles.shutterOuter}
+            >
+              {capturandoFoto ? (
+                <ActivityIndicator color="#0f172a" />
+              ) : (
+                <View style={styles.shutterInner} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -607,5 +688,58 @@ const styles = StyleSheet.create({
   botonEnviarTexto: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  cameraModalContainer: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  cameraPreview: {
+    flex: 1,
+  },
+  cameraTopBar: {
+    position: "absolute",
+    top: 48,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  cameraCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cameraTitle: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  cameraBottomBar: {
+    position: "absolute",
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shutterOuter: {
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    borderWidth: 4,
+    borderColor: "#ffffff",
+    backgroundColor: "rgba(255,255,255,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shutterInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#ffffff",
   },
 });

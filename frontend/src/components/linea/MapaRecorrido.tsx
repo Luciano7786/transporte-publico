@@ -32,7 +32,6 @@ export const MapaRecorrido: React.FC<MapaRecorridoProps> = ({
     return resultado;
   }, [trazadoNormal, trazadoAlternativo, colorLinea]);
 
-  // Marcadores de inicio y fin del recorrido normal
   const puntos = useMemo<PuntoMapa[]>(() => {
     const resultado: PuntoMapa[] = [];
     if (trazadoNormal.length > 0) {
@@ -56,7 +55,6 @@ export const MapaRecorrido: React.FC<MapaRecorridoProps> = ({
     return resultado;
   }, [trazadoNormal, colorLinea]);
 
-  // Centra el mapa en el punto medio del recorrido
   const centro = useMemo<Coordenadas>(() => {
     if (trazadoNormal.length === 0) return CENTRO_DEFAULT;
     const lat = trazadoNormal.reduce((s, c) => s + c.latitud, 0) / trazadoNormal.length;

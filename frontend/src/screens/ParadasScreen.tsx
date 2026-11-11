@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   StyleSheet,
@@ -17,6 +17,7 @@ import {
   LineaHorariosCard,
   TusParadasCard,
 } from "../components/inicio/TusParadasCard";
+import { AuthContext } from "../contexts/AuthContext";
 import { useThemeContext } from "../hooks/use-theme-context";
 import {
   calcularDistanciaMetros,
@@ -24,6 +25,7 @@ import {
   useUbicacion,
 } from "../hooks/use-ubicacion";
 import { obtenerAvisos, obtenerLineas } from "../services/lineas.service";
+import { notificarNuevosAvisosEnLineasFavoritas } from "../services/notificaciones.service";
 import {
   calcularProximosHorarios,
   obtenerHorariosPorParada,
@@ -35,6 +37,7 @@ import type { Aviso, Linea, Parada } from "../types";
 export function ParadasScreen() {
   const navigation = useNavigation<any>();
   const { paleta } = useThemeContext();
+  const auth = useContext(AuthContext);
   const { coordenadas: usuarioCoords } = useUbicacion();
 
   const [paradas, setParadas] = useState<Parada[]>([]);
@@ -46,27 +49,34 @@ export function ParadasScreen() {
     { numero: "14", color: "#B45309", proximos: ["10:51", "11:21", "11:51"] },
   ]);
 
-  // Calcula la parada más cercana en base a las coordenadas reales del usuario
-  const paradaMasCercana = useMemo(() => {
+  const paradaDestacada = useMemo(() => {
     if (paradas.length === 0) return null;
-    let cercana = paradas[0];
-    let menorDist = calcularDistanciaMetros(usuarioCoords, cercana.coordenadas);
 
-    for (let i = 1; i < paradas.length; i++) {
-      const dist = calcularDistanciaMetros(usuarioCoords, paradas[i].coordenadas);
+    const idsFavoritas = auth?.paradasFavoritas ?? [];
+    const favoritasDisponibles = paradas.filter((p) =>
+      idsFavoritas.includes(p.id),
+    );
+    const pool =
+      favoritasDisponibles.length > 0 ? favoritasDisponibles : paradas;
+
+    let elegida = pool[0];
+    let menorDist = calcularDistanciaMetros(usuarioCoords, elegida.coordenadas);
+
+    for (let i = 1; i < pool.length; i++) {
+      const dist = calcularDistanciaMetros(usuarioCoords, pool[i].coordenadas);
       if (dist < menorDist) {
         menorDist = dist;
-        cercana = paradas[i];
+        elegida = pool[i];
       }
     }
 
     return {
-      parada: cercana,
+      parada: elegida,
       distanciaMetros: menorDist,
+      esFavorita: idsFavoritas.includes(elegida.id),
     };
-  }, [paradas, usuarioCoords]);
+  }, [paradas, usuarioCoords, auth?.paradasFavoritas]);
 
-  // Filtra las paradas en tiempo real por nombre o calle (funciona incluso sin permiso de GPS)
   const paradasFiltradas = useMemo(() => {
     const termino = busqueda.trim().toLowerCase();
     if (!termino) return [];
@@ -98,8 +108,15 @@ export function ParadasScreen() {
             setLineasCatalogo(resLineas.value.datos);
           }
           if (resAvisos.status === "fulfilled" && resAvisos.value.datos) {
-            const desvio = resAvisos.value.datos.find((a) => a.gravedad === "desvio");
-            setAvisoDestacado(desvio ?? resAvisos.value.datos[0] ?? null);
+            const listaAvisos = resAvisos.value.datos;
+            const desvio = listaAvisos.find((a) => a.gravedad === "desvio");
+            setAvisoDestacado(desvio ?? listaAvisos[0] ?? null);
+
+            notificarNuevosAvisosEnLineasFavoritas(
+              listaAvisos,
+              auth?.lineasFavoritas ?? ["lin-05", "lin-14"],
+              auth?.usuario?.avisosActivos ?? true,
+            ).catch(() => {});
           }
         }
       } catch (err) {
@@ -114,10 +131,9 @@ export function ParadasScreen() {
     };
   }, []);
 
-  // Actualiza los próximos horarios de la parada más cercana usando la hora real del sistema
   useEffect(() => {
     let activo = true;
-    const paradaObjetivo = paradaMasCercana?.parada;
+    const paradaObjetivo = paradaDestacada?.parada;
     const idParada = paradaObjetivo?.id ?? "par-101";
     const idsLineas = paradaObjetivo?.lineaIds ?? ["lin-05", "lin-14"];
 
@@ -134,7 +150,6 @@ export function ParadasScreen() {
           const color =
             lineaInfo?.color ?? (lId === "lin-05" ? "#1B6CA8" : "#B45309");
 
-          // Calcula con la hora real del dispositivo; si ya terminó el servicio hoy, muestra los primeros de mañana
           const calc = calcularProximosHorarios(
             resHorarios.datos,
             lId,
@@ -172,7 +187,7 @@ export function ParadasScreen() {
     return () => {
       activo = false;
     };
-  }, [paradaMasCercana?.parada.id, lineasCatalogo]);
+  }, [paradaDestacada?.parada.id, lineasCatalogo]);
 
   const handleQrPress = () => {
     navigation.navigate("EscanearQr");
@@ -205,7 +220,6 @@ export function ParadasScreen() {
     >
       <InicioHeader titulo="Paraná" onPressQr={handleQrPress} />
 
-      {/* Buscador de paradas por nombre o por calle */}
       <View style={styles.searchWrapper}>
         <View
           style={[
@@ -236,7 +250,6 @@ export function ParadasScreen() {
         </View>
       </View>
 
-      {/* Si el usuario está buscando por nombre/calle, mostramos resultados directos */}
       {busqueda.trim().length > 0 ? (
         <View style={styles.resultadosContainer}>
           <FlatList
@@ -291,14 +304,14 @@ export function ParadasScreen() {
       ) : (
         <>
           <TusParadasCard
-            nombreParada={paradaMasCercana?.parada.nombre ?? "Alameda y Urquiza"}
+            nombreParada={paradaDestacada?.parada.nombre ?? "Alameda y Urquiza"}
             distancia={
-              paradaMasCercana
-                ? formatearDistancia(paradaMasCercana.distanciaMetros)
+              paradaDestacada
+                ? formatearDistancia(paradaDestacada.distanciaMetros)
                 : "a 120 m"
             }
             lineas={lineasCard}
-            onPress={() => handleParadaPress(paradaMasCercana?.parada)}
+            onPress={() => handleParadaPress(paradaDestacada?.parada)}
           />
 
           <AvisosHoyCard

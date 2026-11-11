@@ -1,4 +1,3 @@
-// src/screens/EscanerQrScreen.tsx
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useIsFocused, useNavigation } from "@react-navigation/native";
 import {
@@ -35,13 +34,10 @@ export function EscanerQrScreen() {
   const [estado, setEstado] = useState<Estado>({ tipo: "escaneando" });
   const [linterna, setLinterna] = useState(false);
 
-  // onBarcodeScanned se dispara muchas veces seguidas con el mismo código.
-  // El ref frena las repeticiones antes de que React vuelva a renderizar.
   const bloqueado = useRef(false);
 
   const abrirParada = useCallback(
     (paradaId: string) => {
-      // replace: al volver atrás se llega al inicio, no de nuevo al escáner.
       navigation.replace("ParadaDetalle", { paradaId });
     },
     [navigation],
@@ -53,7 +49,6 @@ export function EscanerQrScreen() {
       bloqueado.current = true;
       setEstado({ tipo: "buscando" });
 
-      // Un QR que no es de una parada no hace ningún pedido a la API.
       const qr = interpretarCodigoQr(data);
       if (!qr) {
         setEstado({
@@ -68,7 +63,6 @@ export function EscanerQrScreen() {
         abrirParada(res.datos?.id ?? qr.paradaId);
       } catch (err) {
         if (err instanceof ErrorApi && err.codigo === "SIN_CONEXION") {
-          // Sin señal: abre igual la parada con el id que trae el código.
           abrirParada(qr.paradaId);
           return;
         }
@@ -91,7 +85,6 @@ export function EscanerQrScreen() {
     setEstado({ tipo: "escaneando" });
   };
 
-  // Los permisos todavía se están consultando.
   if (!permiso) {
     return (
       <View style={[styles.centro, { backgroundColor: paleta.fondoApp }]} />
@@ -147,7 +140,6 @@ export function EscanerQrScreen() {
 
   return (
     <View style={styles.contenedor}>
-      {/* La cámara se suelta cuando la pantalla deja de estar a la vista. */}
       {enfocada && (
         <CameraView
           style={StyleSheet.absoluteFill}
@@ -176,7 +168,6 @@ export function EscanerQrScreen() {
             <Ionicons name="close" size={24} color="#ffffff" />
           </TouchableOpacity>
 
-          {/* De noche se usa mucho: la linterna ayuda a leer el cartel. */}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => setLinterna((prendida) => !prendida)}

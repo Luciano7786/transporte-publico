@@ -1,15 +1,23 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useThemeContext } from "../../hooks/use-theme-context";
 import { formatearTiempoTranscurrido } from "../../services/reportes.service";
-import type { ReporteDeDemora } from "../../types";
+import type { MotivoDemora, ReporteDeDemora } from "../../types";
 
 interface DemoraReporteCardProps {
   reporte: ReporteDeDemora;
   onConfirmar?: (reporteId: string) => void;
   confirmadoPorMi?: boolean;
 }
+
+const ETIQUETA_MOTIVO: Record<MotivoDemora, string> = {
+  no_paso: "No pasó",
+  paso_lleno: "Pasó lleno y no paró",
+  demorado: "Viene demorado",
+  unidad_rota: "Unidad rota",
+  calle_cortada: "Calle cortada",
+};
 
 export const DemoraReporteCard: React.FC<DemoraReporteCardProps> = ({
   reporte,
@@ -21,6 +29,8 @@ export const DemoraReporteCard: React.FC<DemoraReporteCardProps> = ({
 
   const tiempo = formatearTiempoTranscurrido(reporte.fechaHora);
   const lineaTexto = reporte.lineaId.replace("lin-0", "L").replace("lin-", "L");
+  const totalPersonas = Math.max(1, reporte.confirmaciones + 1);
+  const motivoLegible = ETIQUETA_MOTIVO[reporte.motivo] ?? "Demora";
 
   return (
     <View
@@ -34,11 +44,27 @@ export const DemoraReporteCard: React.FC<DemoraReporteCardProps> = ({
     >
       <View style={styles.mensajeRow}>
         <Ionicons name="alert-circle" size={18} color={estiloAviso.texto} />
-        <Text style={[styles.mensajeTexto, { color: paleta.textoAlto }]}>
-          {reporte.confirmaciones}{" "}
-          {reporte.confirmaciones === 1 ? "pasajero reportó" : "pasajeros reportaron"}{" "}
-          demora en la {lineaTexto} {tiempo}
-        </Text>
+        <View style={styles.textosColumna}>
+          <Text style={[styles.mensajeTexto, { color: paleta.textoAlto }]}>
+            {totalPersonas}{" "}
+            {totalPersonas === 1 ? "pasajero reportó" : "pasajeros reportaron"}:{" "}
+            {motivoLegible.toLowerCase()} en la {lineaTexto} ({tiempo})
+          </Text>
+
+          {reporte.comentario ? (
+            <Text style={[styles.comentarioTexto, { color: paleta.textoMedio }]}>
+              "{reporte.comentario}"
+            </Text>
+          ) : null}
+
+          {reporte.fotoUri ? (
+            <Image
+              source={{ uri: reporte.fotoUri }}
+              style={styles.fotoReporte}
+              resizeMode="cover"
+            />
+          ) : null}
+        </View>
       </View>
 
       <TouchableOpacity
@@ -53,7 +79,9 @@ export const DemoraReporteCard: React.FC<DemoraReporteCardProps> = ({
             { color: confirmadoPorMi ? paleta.exito : paleta.textoAlto },
           ]}
         >
-          {confirmadoPorMi ? "✓ Demora confirmada" : "Confirmar"}
+          {confirmadoPorMi
+            ? "✓ A mí también (confirmado)"
+            : "A mí también · Confirmar"}
         </Text>
       </TouchableOpacity>
     </View>
@@ -73,14 +101,28 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 8,
   },
-  mensajeTexto: {
+  textosColumna: {
     flex: 1,
+  },
+  mensajeTexto: {
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 20,
   },
-  confirmarBoton: {
+  comentarioTexto: {
+    fontSize: 13,
+    fontStyle: "italic",
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  fotoReporte: {
+    width: "100%",
+    height: 130,
+    borderRadius: 10,
     marginTop: 8,
+  },
+  confirmarBoton: {
+    marginTop: 10,
     marginLeft: 26,
     alignSelf: "flex-start",
   },

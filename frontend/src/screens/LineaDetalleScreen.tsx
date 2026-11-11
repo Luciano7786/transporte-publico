@@ -1,5 +1,5 @@
 import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LineaAvisoBanner } from "../components/linea/LineaAvisoBanner";
@@ -10,6 +10,7 @@ import {
   ParadasTimeline,
 } from "../components/linea/ParadasTimeline";
 import { SentidoSelector } from "../components/linea/SentidoSelector";
+import { AuthContext } from "../contexts/AuthContext";
 import { useThemeContext } from "../hooks/use-theme-context";
 import {
   obtenerAvisoVigentePorLinea,
@@ -22,8 +23,10 @@ export function LineaDetalleScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { paleta } = useThemeContext();
+  const auth = useContext(AuthContext);
 
   const lineaId = route.params?.lineaId ?? "lin-07";
+  const esFavorita = Boolean(auth?.lineasFavoritas.includes(lineaId));
 
   const [linea, setLinea] = useState<Linea>({
     id: "lin-07",
@@ -123,10 +126,9 @@ export function LineaDetalleScreen() {
             const encontrada = todasParadas.find((p) => p.id === id);
             let estado: "normal" | "sin_servicio" | "provisoria" = "normal";
 
-            // Solo marcamos paradas afectadas si la línea tiene un desvío activo en sentido ida
             if (sentido === "ida" && tieneDesvioActivo) {
-              if (id === "par-103") estado = "sin_servicio"; // Corrientes y 25 de Mayo
-              if (id === "par-104") estado = "provisoria"; // Santa Fe y Urquiza
+              if (id === "par-103") estado = "sin_servicio";
+              if (id === "par-104") estado = "provisoria";
             }
 
             return {
@@ -167,12 +169,19 @@ export function LineaDetalleScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: paleta.fondoApp }]}
     >
-      {/* 1. Header con volver, badge de línea y nombre */}
       <LineaHeader
         numero={linea.numero}
         nombre={linea.nombre}
         color={linea.color}
-        onPressVolver={() => navigation.goBack()}
+        esFavorita={esFavorita}
+        onPressVolver={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          } else {
+            navigation.navigate("MainTabs");
+          }
+        }}
+        onToggleFavorita={() => auth?.alternarLineaFavorita(linea.id)}
       />
 
       <ScrollView
@@ -180,7 +189,6 @@ export function LineaDetalleScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 2. Banner de desvío vigente */}
         {aviso && aviso.gravedad === "desvio" ? (
           <LineaAvisoBanner
             titulo={aviso.titulo}
@@ -189,7 +197,6 @@ export function LineaDetalleScreen() {
           />
         ) : null}
 
-        {/* 3. Selector de Sentido (Ida / Vuelta) */}
         <SentidoSelector
           sentido={sentido}
           destinoIda={recorridoIda?.destino ?? "a Bajada Grande"}
@@ -197,7 +204,6 @@ export function LineaDetalleScreen() {
           onChange={setSentido}
         />
 
-        {/* 4. Mapa del recorrido (con trazado alternativo punteado si hay desvío en ida) */}
         <MapaRecorrido
           trazadoNormal={recorridoActual?.trazado ?? []}
           trazadoAlternativo={
@@ -213,7 +219,6 @@ export function LineaDetalleScreen() {
           }
         />
 
-        {/* 5. Timeline vertical de paradas */}
         <ParadasTimeline
           paradas={
             paradasMapeadas.length > 0

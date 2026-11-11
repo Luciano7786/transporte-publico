@@ -1,6 +1,9 @@
 import React, { useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
+import MapView, { Marker, Polyline } from "react-native-maps";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
+
+export const ComponentesMapaNativo = { MapView, Marker, Polyline };
 
 export interface PuntoMapa {
   id: string;
@@ -8,7 +11,6 @@ export interface PuntoMapa {
   longitud: number;
   titulo?: string;
   color?: string;
-  /** "usuario" dibuja el punto azul de "Tu ubicación"; "parada" un círculo de color. */
   tipo?: "usuario" | "parada";
 }
 
@@ -24,14 +26,9 @@ interface MapaLeafletProps {
   puntos?: PuntoMapa[];
   lineas?: LineaMapa[];
   oscuro?: boolean;
-  /** Se llama con el id del punto tocado. */
   onPressPunto?: (id: string) => void;
 }
 
-/**
- * Mapa Leaflet + OpenStreetMap dentro de un WebView.
- * No depende de Google Maps ni de ninguna API key.
- */
 export const MapaLeaflet: React.FC<MapaLeafletProps> = ({
   centro,
   zoom = 15,
@@ -42,7 +39,6 @@ export const MapaLeaflet: React.FC<MapaLeafletProps> = ({
 }) => {
   const ref = useRef<WebView>(null);
 
-  // El HTML se regenera solo cuando cambian los datos del mapa.
   const html = useMemo(() => {
     const datos = JSON.stringify({ centro, zoom, puntos, lineas, oscuro });
     return `<!DOCTYPE html>
@@ -113,7 +109,6 @@ export const MapaLeaflet: React.FC<MapaLeafletProps> = ({
       const { id } = JSON.parse(e.nativeEvent.data) as { id: string };
       onPressPunto?.(id);
     } catch {
-      // mensaje inválido: se ignora
     }
   };
 

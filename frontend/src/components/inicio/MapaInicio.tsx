@@ -10,11 +10,10 @@ interface MapaInicioProps {
   onSelectParada?: (parada: Parada) => void;
 }
 
-// Asigna un color al pin según la parada para que coincida con la imagen de referencia
 const obtenerColorPin = (paradaId: string) => {
-  if (paradaId === "par-101") return "#1B6CA8"; // Azul (Línea 5)
-  if (paradaId === "par-104") return "#B45309"; // Naranja (Línea 14)
-  return "#CBD5E1"; // Gris claro / blanco
+  if (paradaId === "par-101") return "#1B6CA8";
+  if (paradaId === "par-104") return "#B45309";
+  return "#CBD5E1";
 };
 
 export const MapaInicio: React.FC<MapaInicioProps> = ({
@@ -24,7 +23,6 @@ export const MapaInicio: React.FC<MapaInicioProps> = ({
 }) => {
   const { paleta, temaActual } = useThemeContext();
 
-  // Ubicación GPS real si está disponible, o centro de Paraná
   const usuario = useMemo<Coordenadas>(
     () => ({
       latitud: usuarioCoordenadas?.latitud ?? -31.7333,

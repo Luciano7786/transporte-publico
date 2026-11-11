@@ -1,5 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Location from "expo-location";
+import { Magnetometer } from "expo-sensors";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -36,17 +37,37 @@ export const ParadaInfoBar: React.FC<ParadaInfoBarProps> = ({
   const { paleta } = useThemeContext();
   const [rumboDispositivo, setRumboDispositivo] = useState<number>(0);
 
-  // Escucha de brújula / magnetómetro del dispositivo cuando está disponible
   useEffect(() => {
-    let sub: Location.LocationSubscription | null = null;
+    let subMagnetometro: { remove: () => void } | null = null;
+    let subHeading: Location.LocationSubscription | null = null;
     let cancelado = false;
 
-    async function iniciarBrujula() {
+    async function iniciarSensoresOrientacion() {
       try {
+        if (Platform.OS !== "web") {
+          const disponible = await Magnetometer.isAvailableAsync().catch(
+            () => false,
+          );
+          if (disponible && !cancelado) {
+            Magnetometer.setUpdateInterval(400);
+            subMagnetometro = Magnetometer.addListener((data) => {
+              if (cancelado) return;
+              const { x, y } = data;
+              let angulo = Math.atan2(y, x) * (180 / Math.PI);
+              angulo = angulo >= 0 ? angulo : angulo + 360;
+              const rumboMag = (360 - angulo + 90) % 360;
+              if (!Number.isNaN(rumboMag)) {
+                setRumboDispositivo(rumboMag);
+              }
+            });
+            return;
+          }
+        }
+
         const { status } = await Location.getForegroundPermissionsAsync();
         if (status !== "granted" || cancelado) return;
 
-        sub = await Location.watchHeadingAsync((headingData) => {
+        subHeading = await Location.watchHeadingAsync((headingData) => {
           if (!cancelado) {
             const rumbo =
               headingData.trueHeading >= 0
@@ -58,19 +79,18 @@ export const ParadaInfoBar: React.FC<ParadaInfoBarProps> = ({
           }
         });
       } catch {
-        // En emuladores o web sin magnetómetro usamos rumbo norte (0°)
       }
     }
 
-    iniciarBrujula();
+    iniciarSensoresOrientacion();
 
     return () => {
       cancelado = true;
-      sub?.remove();
+      subMagnetometro?.remove();
+      subHeading?.remove();
     };
   }, []);
 
-  // Ángulo geográfico hacia la parada respecto a la posición del pasajero
   const rumboParada = calcularRumboGrados(usuarioCoordenadas, coordenadas);
   const rotacionFlecha = Math.round((rumboParada - rumboDispositivo + 360) % 360);
   const puntoCardinal = obtenerPuntoCardinal(rumboParada);
@@ -104,7 +124,6 @@ export const ParadaInfoBar: React.FC<ParadaInfoBarProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Pill con flecha de orientación dinámica hacia la parada y distancia */}
       <View style={styles.pill}>
         <Ionicons
           name="arrow-up-outline"
@@ -117,7 +136,6 @@ export const ParadaInfoBar: React.FC<ParadaInfoBarProps> = ({
         </Text>
       </View>
 
-      {/* Enlace Cómo llegar */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={handleComoLlegar}

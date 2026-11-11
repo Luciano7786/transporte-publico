@@ -1,52 +1,187 @@
+import { Directory, File, Paths } from "expo-file-system";
 import * as Network from "expo-network";
+import { Platform } from "react-native";
 import {
   encolarReporteOffline,
   limpiarReportesSincronizados,
   marcarReporteSincronizado,
   obtenerReportesPendientes,
 } from "../db/database";
+import { REPORTES_MOCK } from "../mocks/reportes.mock";
 import type { MotivoDemora, ReporteDeDemora, RespuestaExitosa } from "../types";
 import { clienteHttp } from "./cliente";
 import { ErrorApi } from "./error.service";
 
-/**
- * Determina si el error recibido corresponde a un corte o falta de conexión.
- */
+export interface ArchivoSubido {
+  url: string;
+  tipo: "imagen" | "audio" | "video";
+  bytes: number;
+}
+
+export function guardarFotoReporteEnDispositivo(uriOrigen: string): string {
+  if (Platform.OS === "web" || !uriOrigen) return uriOrigen;
+
+  try {
+    const dirFotos = new Directory(Paths.document, "reportes-fotos");
+    if (!dirFotos.exists) {
+      dirFotos.create({ intermediates: true, idempotent: true });
+    }
+
+    const archivoOrigen = new File(uriOrigen);
+    if (!archivoOrigen.exists) {
+      return uriOrigen;
+    }
+
+    if (uriOrigen.includes("reportes-fotos")) {
+      return archivoOrigen.uri;
+    }
+
+    const ext =
+      uriOrigen
+        .split(".")
+        .pop()
+        ?.toLowerCase()
+        .replace(/[^a-z0-9]/g, "") || "jpg";
+    const extensionSegura = ext === "png" || ext === "webp" ? ext : "jpg";
+    const archivoDestino = new File(
+      dirFotos,
+      `evidencia-${Date.now()}.${extensionSegura}`,
+    );
+
+    archivoOrigen.copy(archivoDestino);
+    return archivoDestino.uri;
+  } catch {
+    return uriOrigen;
+  }
+}
+
+export async function subirArchivoImagen(
+  uriLocal: string,
+): Promise<RespuestaExitosa<ArchivoSubido>> {
+  const uriPersistida = guardarFotoReporteEnDispositivo(uriLocal);
+  const formData = new FormData();
+  const extension = uriPersistida.split(".").pop()?.toLowerCase() || "jpg";
+  const mime =
+    extension === "png"
+      ? "image/png"
+      : extension === "webp"
+        ? "image/webp"
+        : "image/jpeg";
+  const nombreArchivo = `reporte-${Date.now()}.${extension === "png" ? "png" : "jpg"}`;
+
+  if (Platform.OS === "web") {
+    const resp = await fetch(uriPersistida);
+    const blob = await resp.blob();
+    formData.append("archivo", blob, nombreArchivo);
+  } else {
+    const archivoLocal = new File(uriPersistida);
+    const uriParaSubir = archivoLocal.exists ? archivoLocal.uri : uriPersistida;
+    formData.append("archivo", {
+      uri: uriParaSubir,
+      name: nombreArchivo,
+      type: mime,
+    } as any);
+  }
+
+  return clienteHttp<ArchivoSubido>("/archivos", {
+    method: "POST",
+    body: formData,
+  });
+}
+
 function esErrorDeConexion(error: unknown): boolean {
+  if (!(error instanceof ErrorApi)) return false;
   return (
-    error instanceof ErrorApi &&
-    (error.codigo === "SIN_CONEXION" || error.codigo === "TIEMPO_AGOTADO")
+    error.codigo === "SIN_CONEXION" ||
+    error.codigo === "TIEMPO_AGOTADO" ||
+    error.codigo === "ERROR_SERVIDOR" ||
+    error.codigo === "ERROR_RESPUESTA"
   );
 }
 
-/**
- * Obtiene los reportes de demora recientes (últimos 90 minutos) de una parada.
- */
-export const obtenerReportesPorParada = (
+export const obtenerReportesPorParada = async (
   paradaId: string,
-): Promise<RespuestaExitosa<ReporteDeDemora[]>> =>
-  clienteHttp<ReporteDeDemora[]>(
-    `/reportes-demora?paradaId=${encodeURIComponent(paradaId)}`,
-  );
+): Promise<RespuestaExitosa<ReporteDeDemora[]>> => {
+  try {
+    return await clienteHttp<ReporteDeDemora[]>(
+      `/reportes-demora?paradaId=${encodeURIComponent(paradaId)}`,
+    );
+  } catch (error) {
+    if (esErrorDeConexion(error)) {
+      const pendientes = await obtenerReportesPendientes();
+      const localesParada: ReporteDeDemora[] = pendientes
+        .filter((r) => r.paradaId === paradaId)
+        .map((r) => ({
+          id: r.id,
+          lineaId: r.lineaId,
+          paradaId: r.paradaId,
+          usuarioId: "yo",
+          motivo: r.motivo,
+          comentario: r.comentario,
+          fotoUri: r.fotoUri ?? null,
+          confirmaciones: 1,
+          fechaHora: r.fechaHora,
+          sincronizado: false,
+        }));
 
-/**
- * Confirma un reporte de demora existente.
- */
-export const confirmarReporte = (
+      const mocksParada = REPORTES_MOCK.filter((r) => r.paradaId === paradaId);
+      const combinados = [...localesParada, ...mocksParada];
+
+      return {
+        datos: combinados,
+        meta: {
+          total: combinados.length,
+          pagina: 1,
+          porPagina: Math.max(1, combinados.length),
+        },
+      };
+    }
+    throw error;
+  }
+};
+
+export const confirmarReporte = async (
   reporteId: string,
-): Promise<RespuestaExitosa<ReporteDeDemora>> =>
-  clienteHttp<ReporteDeDemora>(
-    `/reportes-demora/${encodeURIComponent(reporteId)}/confirmaciones`,
-    {
-      method: "POST",
-    },
-  );
+): Promise<RespuestaExitosa<ReporteDeDemora>> => {
+  try {
+    return await clienteHttp<ReporteDeDemora>(
+      `/reportes-demora/${encodeURIComponent(reporteId)}/confirmaciones`,
+      {
+        method: "POST",
+      },
+    );
+  } catch (error) {
+    if (esErrorDeConexion(error)) {
+      const enMock = REPORTES_MOCK.find((r) => r.id === reporteId);
+      if (enMock) {
+        enMock.confirmaciones += 1;
+        return { datos: { ...enMock }, meta: null };
+      }
 
-/**
- * Crea un nuevo reporte de demora.
- * Estrategia de Resiliencia: si no hay internet (SIN_CONEXION), guarda el reporte
- * en la tabla local cola_reportes_offline de SQLite para sincronizarlo al recuperar señal.
- */
+      const pendientes = await obtenerReportesPendientes();
+      const local = pendientes.find((r) => r.id === reporteId);
+      if (local) {
+        return {
+          datos: {
+            id: local.id,
+            lineaId: local.lineaId,
+            paradaId: local.paradaId,
+            usuarioId: "yo",
+            motivo: local.motivo,
+            comentario: local.comentario,
+            fotoUri: local.fotoUri ?? null,
+            confirmaciones: 2,
+            fechaHora: local.fechaHora,
+            sincronizado: false,
+          },
+          meta: null,
+        };
+      }
+    }
+    throw error;
+  }
+};
+
 export const crearReporte = async (nuevo: {
   id?: string;
   lineaId: string;
@@ -57,7 +192,7 @@ export const crearReporte = async (nuevo: {
 }): Promise<RespuestaExitosa<ReporteDeDemora>> => {
   const reporteId = nuevo.id ?? `rep-off-${Date.now()}`;
   const fechaHora = new Date().toISOString();
-  const fotoUri = nuevo.fotoUri?.startsWith("http") ? nuevo.fotoUri : null;
+  const fotoUri = nuevo.fotoUri ?? null;
 
   const payload: Record<string, any> = {
     lineaId: nuevo.lineaId,
@@ -68,9 +203,22 @@ export const crearReporte = async (nuevo: {
 
   if (nuevo.id) payload.id = nuevo.id;
   if (nuevo.comentario?.trim()) payload.comentario = nuevo.comentario.trim();
-  if (fotoUri) payload.fotoUri = fotoUri;
 
   try {
+    if (nuevo.fotoUri) {
+      if (
+        nuevo.fotoUri.startsWith("file:") ||
+        nuevo.fotoUri.startsWith("content:") ||
+        nuevo.fotoUri.startsWith("data:") ||
+        nuevo.fotoUri.startsWith("blob:")
+      ) {
+        const resArchivo = await subirArchivoImagen(nuevo.fotoUri);
+        payload.fotoUri = resArchivo.datos.url;
+      } else if (nuevo.fotoUri.startsWith("http")) {
+        payload.fotoUri = nuevo.fotoUri;
+      }
+    }
+
     const res = await clienteHttp<ReporteDeDemora>("/reportes-demora", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -78,7 +226,6 @@ export const crearReporte = async (nuevo: {
     return res;
   } catch (error) {
     if (esErrorDeConexion(error)) {
-      // Guardar en cola local offline
       await encolarReporteOffline({
         id: reporteId,
         lineaId: nuevo.lineaId,
@@ -109,9 +256,6 @@ export const crearReporte = async (nuevo: {
   }
 };
 
-/**
- * Sincroniza los reportes pendientes almacenados en SQLite enviándolos a la API.
- */
 export async function sincronizarReportesOffline(): Promise<{
   sincronizados: number;
   fallidos: number;
@@ -124,6 +268,16 @@ export async function sincronizarReportesOffline(): Promise<{
 
   for (const rep of pendientes) {
     try {
+      let fotoUrlRemota: string | undefined;
+      if (rep.fotoUri) {
+        if (rep.fotoUri.startsWith("http")) {
+          fotoUrlRemota = rep.fotoUri;
+        } else {
+          const resArchivo = await subirArchivoImagen(rep.fotoUri);
+          fotoUrlRemota = resArchivo.datos.url;
+        }
+      }
+
       await clienteHttp<ReporteDeDemora>("/reportes-demora", {
         method: "POST",
         body: JSON.stringify({
@@ -131,7 +285,7 @@ export async function sincronizarReportesOffline(): Promise<{
           paradaId: rep.paradaId,
           motivo: rep.motivo,
           comentario: rep.comentario,
-          ...(rep.fotoUri ? { fotoUri: rep.fotoUri } : {}),
+          ...(fotoUrlRemota ? { fotoUri: fotoUrlRemota } : {}),
           fechaHora: rep.fechaHora,
         }),
       });
@@ -150,12 +304,7 @@ export async function sincronizarReportesOffline(): Promise<{
   return { sincronizados, fallidos };
 }
 
-/**
- * Inicia la escucha automática de estado de red con expo-network para reenviar
- * reportes pendientes en cuanto se recupera la conexión a internet.
- */
 export function iniciarEscuchaRedYSincronizacion(): () => void {
-  // Intentar sincronizar al arrancar por si quedaron reportes previos
   sincronizarReportesOffline().catch(() => {});
 
   const sub = Network.addNetworkStateListener((state) => {
@@ -171,9 +320,6 @@ export function iniciarEscuchaRedYSincronizacion(): () => void {
   };
 }
 
-/**
- * Calcula un texto legible del tiempo transcurrido (ej: "hace 15 min").
- */
 export function formatearTiempoTranscurrido(fechaIso: string): string {
   const ahora = Date.now();
   const fecha = new Date(fechaIso).getTime();

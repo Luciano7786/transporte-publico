@@ -1,24 +1,45 @@
 {
   "expo": {
-    "name": "transporte-publico",
+    "name": "Paraná en Colectivo",
     "slug": "transporte-publico",
     "version": "1.0.0",
     "scheme": "transporte-publico",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D254C"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "ar.gob.parana.transportepublico"
     },
     "android": {
+      "package": "ar.gob.parana.transportepublico",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0D254C"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.VIBRATE",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-sqlite",
       "expo-secure-store",
+      "expo-video",
       [
         "expo-camera",
         {
@@ -38,7 +59,25 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Permite acceder a tu ubicación para mostrarte las paradas más cercanas y calcular las distancias reales."
         }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Permite desbloquear tu sesión rápidamente con huella digital o reconocimiento facial."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0D254C"
+        }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ce620853-16f9-4f63-a588-f32853193164"
+      }
+    }
   }
 }

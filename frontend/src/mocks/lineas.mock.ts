@@ -1,28 +1,12 @@
 import { delay } from "../helper/delay";
 import type { Aviso, Linea, RespuestaApi } from "../types";
 
-// ---------------------------------------------------------------------------
-// Escenarios para probar los casos feos que pide el PDF.
-// Cambialo antes de cargar la pantalla, por ejemplo:
-//   mockConfig.escenario = "vacio";        // lista vacía
-//   mockConfig.escenario = "sin-conexion"; // error de red
-// ---------------------------------------------------------------------------
-
 export type EscenarioMock = "normal" | "vacio" | "sin-conexion";
 
 export const mockConfig: { escenario: EscenarioMock } = { escenario: "normal" };
 
-// Fechas relativas a "ahora", para que el aviso vigente no venza mientras
-// desarrollás. toISOString() devuelve la hora con zona UTC ("...Z").
 const enDias = (dias: number) =>
   new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString();
-
-// ---------------------------------------------------------------------------
-// Líneas
-// Los nombres y colores son inventados, salvo la línea 5 (del PDF).
-// `trazado` y `paradaIds` quedan vacíos: la lista no los usa. Se completan
-// cuando se arme la pantalla de una línea.
-// ---------------------------------------------------------------------------
 
 const MORENO = "Transporte Mariano Moreno";
 const ERSA = "Ersa Urbana";
@@ -40,8 +24,28 @@ const linea = (
   color,
   empresa,
   recorridos: [
-    { sentido: "ida", destino: `hacia ${a}`, trazado: [], paradaIds: [] },
-    { sentido: "vuelta", destino: `hacia ${b}`, trazado: [], paradaIds: [] },
+    {
+      sentido: "ida",
+      destino: `hacia ${b}`,
+      trazado: [
+        { latitud: -31.732, longitud: -60.529 },
+        { latitud: -31.7333, longitud: -60.5241 },
+        { latitud: -31.735, longitud: -60.522 },
+        { latitud: -31.741, longitud: -60.518 },
+      ],
+      paradaIds: ["par-102", "par-101", "par-104", "par-108"],
+    },
+    {
+      sentido: "vuelta",
+      destino: `hacia ${a}`,
+      trazado: [
+        { latitud: -31.741, longitud: -60.518 },
+        { latitud: -31.735, longitud: -60.522 },
+        { latitud: -31.7333, longitud: -60.5241 },
+        { latitud: -31.732, longitud: -60.529 },
+      ],
+      paradaIds: ["par-108", "par-104", "par-101", "par-102"],
+    },
   ],
   activa: true,
 });
@@ -96,14 +100,6 @@ export const LINEAS_MOCK: Linea[] = [
   linea("14", "San Agustín", "Bajada Grande", "#B45309", MORENO),
 ];
 
-// ---------------------------------------------------------------------------
-// Avisos
-//  - avi-088: desvío vigente, con video y recorrido alternativo (líneas 2, 7, 9)
-//  - avi-089: informativo vigente, sin fecha de fin y sin video (línea 14)
-//  - avi-070: ya venció (línea 3): esa línea debe verse como normal
-//  - avi-090: todavía no empezó (línea 6): esa línea también se ve normal
-// ---------------------------------------------------------------------------
-
 export const AVISOS_MOCK: Aviso[] = [
   {
     id: "avi-088",
@@ -155,18 +151,12 @@ export const AVISOS_MOCK: Aviso[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// "Servidor" simulado
-// ---------------------------------------------------------------------------
-
 const responderLista = async <T>(
   datos: T[],
   demora: number,
 ): Promise<RespuestaApi<T[]>> => {
-  // Simula la demora de la red, para poder ver el estado de carga.
   await delay(demora);
 
-  // Sin conexión no llega ninguna respuesta: fetch rechaza la promesa.
   if (mockConfig.escenario === "sin-conexion") {
     return {
       error: {

@@ -7,9 +7,9 @@ export type Sentido = "ida" | "vuelta";
 
 export interface Recorrido {
  sentido: Sentido;
- destino: string; // "hacia Puerto Viejo"
- trazado: Coordenadas[]; // para dibujar la línea en el mapa
- paradaIds: string[]; // en orden de paso
+ destino: string;
+ trazado: Coordenadas[];
+ paradaIds: string[];
 }
 
 export interface Linea {
@@ -28,7 +28,7 @@ export interface Parada {
  coordenadas: Coordenadas;
  lineaIds: string[];
  sentido: Sentido;
- refugio: boolean; // si tiene garita
+ refugio: boolean;
  codigoQr: string | null;
 }
 
@@ -39,7 +39,7 @@ export interface Horario {
  paradaId: string;
  sentido: Sentido;
  tipoDeDia: TipoDeDia;
- hora: string; // "HH:MM", hora de tabla
+ hora: string;
 }
 
 export type Gravedad = "informativo" | "desvio" | "suspension";

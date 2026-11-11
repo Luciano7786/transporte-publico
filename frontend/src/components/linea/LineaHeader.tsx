@@ -7,20 +7,23 @@ interface LineaHeaderProps {
   numero: string;
   nombre: string;
   color: string;
+  esFavorita?: boolean;
   onPressVolver: () => void;
+  onToggleFavorita?: () => void;
 }
 
 export const LineaHeader: React.FC<LineaHeaderProps> = ({
   numero,
   nombre,
   color,
+  esFavorita = false,
   onPressVolver,
+  onToggleFavorita,
 }) => {
   const { paleta } = useThemeContext();
 
   return (
     <View style={styles.header}>
-      {/* Botón Volver */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={onPressVolver}
@@ -37,18 +40,40 @@ export const LineaHeader: React.FC<LineaHeaderProps> = ({
         <Ionicons name="chevron-back" size={22} color={paleta.textoAlto} />
       </TouchableOpacity>
 
-      {/* Badge de la línea */}
       <View style={[styles.badge, { backgroundColor: color }]}>
         <Text style={styles.badgeTexto}>{numero}</Text>
       </View>
 
-      {/* Nombre de la línea */}
       <Text
         style={[styles.nombre, { color: paleta.textoAlto }]}
         numberOfLines={1}
       >
         {nombre}
       </Text>
+
+      {onToggleFavorita ? (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={onToggleFavorita}
+          style={[
+            styles.iconButton,
+            {
+              backgroundColor: paleta.superficie1,
+              borderColor: paleta.borde,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={
+            esFavorita ? "Quitar línea de favoritas" : "Marcar línea como favorita"
+          }
+        >
+          <Ionicons
+            name={esFavorita ? "star" : "star-outline"}
+            size={21}
+            color={esFavorita ? "#F59E0B" : paleta.textoMedio}
+          />
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 };

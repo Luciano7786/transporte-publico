@@ -1,7 +1,6 @@
 import { delay } from "../helper/delay";
 import type { Usuario } from "../types";
 
-// Solo para pruebas porque el token y contraseña no forman parte de la interfaz base Usuario
 interface UsuarioMock extends Usuario {
   contrasenia: string;
   token: string;

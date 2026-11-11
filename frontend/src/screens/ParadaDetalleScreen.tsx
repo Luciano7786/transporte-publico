@@ -1,6 +1,6 @@
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -14,12 +14,17 @@ import { DemoraReporteCard } from "../components/parada/DemoraReporteCard";
 import { LineaHorarioCard } from "../components/parada/LineaHorarioCard";
 import { ParadaHeader } from "../components/parada/ParadaHeader";
 import { ParadaInfoBar } from "../components/parada/ParadaInfoBar";
+import { AuthContext } from "../contexts/AuthContext";
 import { useThemeContext } from "../hooks/use-theme-context";
 import {
   calcularDistanciaMetros,
   useUbicacion,
 } from "../hooks/use-ubicacion";
 import { obtenerLineas } from "../services/lineas.service";
+import {
+  cancelarRecordatorioColectivo,
+  programarRecordatorioColectivo,
+} from "../services/notificaciones.service";
 import {
   calcularProximosHorarios,
   obtenerHorariosPorParada,
@@ -43,9 +48,11 @@ export function ParadaDetalleScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { paleta } = useThemeContext();
+  const auth = useContext(AuthContext);
   const { coordenadas: usuarioCoords } = useUbicacion();
 
   const paradaId = route.params?.paradaId ?? "par-101";
+  const esFavorita = Boolean(auth?.paradasFavoritas.includes(paradaId));
 
   const [parada, setParada] = useState<Parada>({
     id: "par-101",
@@ -66,12 +73,12 @@ export function ParadaDetalleScreen() {
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [reportes, setReportes] = useState<ReporteDeDemora[]>([]);
   const [reportesConfirmados, setReportesConfirmados] = useState<string[]>([]);
-  const [esFavorita, setEsFavorita] = useState<boolean>(true);
   const [tipoDiaSeleccionado, setTipoDiaSeleccionado] = useState<TipoDeDia>(() =>
     obtenerTipoDeDiaActual(),
   );
   const [recordatoriosActivos, setRecordatoriosActivos] = useState<Record<string, boolean>>({});
   const timersRecordatorioRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const notificacionesIdsRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     let activo = true;
@@ -105,8 +112,27 @@ export function ParadaDetalleScreen() {
     };
   }, [paradaId]);
 
+  useFocusEffect(
+    useCallback(() => {
+      let activo = true;
+      obtenerReportesPorParada(paradaId)
+        .then((res) => {
+          if (activo && res.datos) {
+            setReportes(res.datos);
+          }
+        })
+        .catch(() => {});
+      return () => {
+        activo = false;
+      };
+    }, [paradaId]),
+  );
+
   const handleConfirmarDemora = async (reporteId: string) => {
     try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+        () => {},
+      );
       const res = await confirmarReporte(reporteId);
       setReportes((prev) =>
         prev.map((r) => (r.id === reporteId ? res.datos : r)),
@@ -138,13 +164,21 @@ export function ParadaDetalleScreen() {
     });
   };
 
-  const handleToggleRecordatorio = (numeroLinea: string, horaColectivo: string) => {
+  const handleToggleRecordatorio = async (
+    numeroLinea: string,
+    horaColectivo: string,
+  ) => {
     const clave = `${numeroLinea}-${horaColectivo}`;
+    await Haptics.selectionAsync().catch(() => {});
 
     if (recordatoriosActivos[clave]) {
       if (timersRecordatorioRef.current[clave]) {
         clearTimeout(timersRecordatorioRef.current[clave]);
         delete timersRecordatorioRef.current[clave];
+      }
+      if (notificacionesIdsRef.current[clave]) {
+        await cancelarRecordatorioColectivo(notificacionesIdsRef.current[clave]);
+        delete notificacionesIdsRef.current[clave];
       }
       setRecordatoriosActivos((prev) => ({ ...prev, [clave]: false }));
       Alert.alert(
@@ -154,7 +188,6 @@ export function ParadaDetalleScreen() {
       return;
     }
 
-    // Calculamos cuánto falta para 10 minutos antes del colectivo
     const ahora = new Date();
     const [hh, mm] = horaColectivo.split(":").map(Number);
     const minutosObjetivo = hh * 60 + mm - 10;
@@ -167,7 +200,19 @@ export function ParadaDetalleScreen() {
 
     setRecordatoriosActivos((prev) => ({ ...prev, [clave]: true }));
 
-    if (diferenciaMin > 0) {
+    const segundosParaDisparo =
+      diferenciaMin > 0 ? diferenciaMin * 60 : 5;
+
+    const notifId = await programarRecordatorioColectivo({
+      numeroLinea,
+      horaColectivo,
+      nombreParada: parada.nombre,
+      segundosParaDisparo,
+    });
+
+    if (notifId) {
+      notificacionesIdsRef.current[clave] = notifId;
+    } else if (diferenciaMin > 0) {
       timersRecordatorioRef.current[clave] = setTimeout(() => {
         Alert.alert(
           `🚌 Línea ${numeroLinea} en 10 minutos`,
@@ -185,14 +230,12 @@ export function ParadaDetalleScreen() {
     );
   };
 
-  // Configuramos todas las líneas que pasan por la parada según el día seleccionado y la hora actual real
   const infoLineas = parada.lineaIds.map((lId) => {
     const lObj = lineas.find((l) => l.id === lId);
     const numero = lObj?.numero ?? lId.replace("lin-0", "").replace("lin-", "");
     const color =
       lObj?.color ?? (lId === "lin-05" ? "#1B6CA8" : "#B45309");
 
-    // Destino según sentido de la parada
     const recorridoParada = lObj?.recorridos.find(
       (r) => r.sentido === parada.sentido,
     );
@@ -203,7 +246,7 @@ export function ParadaDetalleScreen() {
     const calc = calcularProximosHorarios(
       horarios,
       lId,
-      undefined, // Usa la hora real del reloj del dispositivo
+      undefined,
       3,
       tipoDiaSeleccionado,
     );
@@ -237,7 +280,6 @@ export function ParadaDetalleScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: paleta.fondoApp }]}
     >
-      {/* 1. Header con volver, nombre y estrella de favorito */}
       <ParadaHeader
         nombre={parada.nombre}
         esFavorita={esFavorita}
@@ -248,7 +290,7 @@ export function ParadaDetalleScreen() {
             navigation.navigate("MainTabs");
           }
         }}
-        onToggleFavorita={() => setEsFavorita((prev) => !prev)}
+        onToggleFavorita={() => auth?.alternarParadaFavorita(parada.id)}
       />
 
       <ScrollView
@@ -256,7 +298,6 @@ export function ParadaDetalleScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 2. Barra de orientación con brújula/rumbo y enlace Cómo llegar */}
         <ParadaInfoBar
           distancia={distanciaTexto}
           sentidoTexto={parada.sentido === "ida" ? "hacia el centro" : "sentido vuelta"}
@@ -265,7 +306,6 @@ export function ParadaDetalleScreen() {
           nombreParada={parada.nombre}
         />
 
-        {/* 3. Selector de tipo de día (Hábiles / Sábados / Domingos / Feriados) */}
         <View style={styles.selectorDiaContainer}>
           {OPCIONES_DIA.map((op) => {
             const activo = tipoDiaSeleccionado === op.id;
@@ -299,7 +339,6 @@ export function ParadaDetalleScreen() {
           })}
         </View>
 
-        {/* 4. Tarjetas de cada línea con sus horarios, tabla completa y recordatorio */}
         {infoLineas.map((item) => (
           <LineaHorarioCard
             key={item.id}
@@ -318,7 +357,6 @@ export function ParadaDetalleScreen() {
           />
         ))}
 
-        {/* 5. Reporte de demoras colaborativo */}
         {reportes.map((rep) => (
           <DemoraReporteCard
             key={rep.id}
@@ -329,7 +367,6 @@ export function ParadaDetalleScreen() {
         ))}
       </ScrollView>
 
-      {/* 6. Botón inferior fijo: Reportar una demora */}
       <View
         style={[
           styles.footer,

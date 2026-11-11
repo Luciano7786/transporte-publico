@@ -1,4 +1,3 @@
-// src/services/cliente.ts
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 import { API_BASE_URL } from "../config/api";
@@ -6,7 +5,7 @@ import type { RespuestaExitosa } from "../types";
 import { ErrorApi } from "./error.service";
 
 const CLAVE_TOKEN = "sesion.token";
-const TIEMPO_MAXIMO_MS = 15000;
+const TIEMPO_MAXIMO_MS = 4000;
 
 export interface OpcionesPeticion extends RequestInit {
   autenticado?: boolean;
@@ -37,8 +36,6 @@ function errorDeLaApi(cuerpo: CuerpoConError): ErrorApi {
   );
 }
 
-// Convierte cualquier cosa que falle en un ErrorApi. Es el único lugar donde
-// se traducen los errores, así las pantallas siempre reciben el mismo tipo.
 function traducirError(error: unknown): ErrorApi {
   if (error instanceof ErrorApi) return error;
 
@@ -50,7 +47,6 @@ function traducirError(error: unknown): ErrorApi {
     return new ErrorApi("ERROR_DESCONOCIDO", "Ocurrió un error inesperado.");
   }
 
-  // El servidor no llegó a responder: no hay conexión o se agotó el tiempo.
   if (!error.response) {
     if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
       return new ErrorApi(
@@ -66,10 +62,8 @@ function traducirError(error: unknown): ErrorApi {
 
   const { status, data } = error.response;
 
-  // La API respondió con { error: { codigo, mensaje } }.
   if (tieneError(data)) return errorDeLaApi(data);
 
-  // Respondió un JSON, pero sin la forma del error de la API.
   if (typeof data === "object" && data !== null) {
     const mensaje = (data as { mensaje?: string }).mensaje;
     return new ErrorApi(
@@ -78,7 +72,6 @@ function traducirError(error: unknown): ErrorApi {
     );
   }
 
-  // Respondió algo que no es JSON (por ejemplo, una página de error).
   return new ErrorApi(
     "ERROR_SERVIDOR",
     `El servidor respondió con código ${status}.`,
@@ -91,7 +84,6 @@ const http = axios.create({
   headers: { Accept: "application/json" },
 });
 
-// Antes de cada petición: adjunta el token de sesión si existe.
 http.interceptors.request.use(async (config) => {
   try {
     const token = await SecureStore.getItemAsync(CLAVE_TOKEN);
@@ -99,15 +91,12 @@ http.interceptors.request.use(async (config) => {
       config.headers.Authorization = `Bearer ${token}`;
     }
   } catch {
-    // Si falla el acceso a SecureStore, sigue sin header de autorización.
   }
   return config;
 });
 
-// Después de cada petición: todo lo que no salga bien termina como ErrorApi.
 http.interceptors.response.use(
   (respuesta) => {
-    // Por si la API devuelve un error dentro de una respuesta 2xx.
     if (tieneError(respuesta.data)) throw errorDeLaApi(respuesta.data);
     return respuesta;
   },
@@ -116,14 +105,6 @@ http.interceptors.response.use(
   },
 );
 
-/**
- * Cliente HTTP base para interactuar con la API NestJS (usa axios).
- * - Adjunta el token Bearer automáticamente si existe.
- * - Desenvuelve el sobre `{ datos, meta }`.
- * - Traduce errores de red y errores de la API `{ error: { codigo, mensaje } }`
- *   a instancias de ErrorApi.
- * Mantiene la misma firma que la versión con fetch: quien lo usa no cambia.
- */
 export async function clienteHttp<T>(
   ruta: string,
   opciones: OpcionesPeticion = {},
@@ -134,9 +115,6 @@ export async function clienteHttp<T>(
   const cuerpoPeticion = opciones.body;
 
   if (cuerpoPeticion instanceof FormData) {
-    // Con fetch NO se pone este header, pero con axios en React Native sí:
-    // sin él, la subida de archivos suele fallar con "Network Error" en
-    // Android. React Native agrega el boundary por su cuenta.
     if (!headers["Content-Type"]) headers["Content-Type"] = "multipart/form-data";
   } else if (cuerpoPeticion && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
@@ -152,7 +130,6 @@ export async function clienteHttp<T>(
 
   const cuerpo = respuesta.data;
 
-  // 204 No Content (ej: eliminar favorito) o respuesta sin cuerpo JSON.
   if (
     respuesta.status === 204 ||
     typeof cuerpo !== "object" ||

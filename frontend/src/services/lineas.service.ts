@@ -1,27 +1,27 @@
+import Storage from "expo-sqlite/kv-store";
 import {
   guardarLineasEnCache,
   obtenerLineaPorIdDeCache,
   obtenerLineasDeCache,
 } from "../db/database";
+import { AVISOS_MOCK } from "../mocks/lineas.mock";
 import type { Aviso, Linea, RespuestaExitosa } from "../types";
 import { clienteHttp } from "./cliente";
 import { ErrorApi } from "./error.service";
 
-/**
- * Determina si el error recibido corresponde a un corte o falta de conexión.
- */
-function esErrorDeConexion(error: unknown): boolean {
+const CLAVE_CACHE_AVISOS = "cache.avisos.lista";
+const CLAVE_CACHE_AVISOS_FECHA = "cache.avisos.fecha_iso";
+
+function esErrorResiliente(error: unknown): boolean {
+  if (!(error instanceof ErrorApi)) return false;
   return (
-    error instanceof ErrorApi &&
-    (error.codigo === "SIN_CONEXION" || error.codigo === "TIEMPO_AGOTADO")
+    error.codigo === "SIN_CONEXION" ||
+    error.codigo === "TIEMPO_AGOTADO" ||
+    error.codigo === "ERROR_SERVIDOR" ||
+    error.codigo === "ERROR_RESPUESTA"
   );
 }
 
-/**
- * Obtiene todas las líneas de transporte urbano de Paraná.
- * Estrategia de Resiliencia: si la red responde, refresca el caché SQLite;
- * si falla por SIN_CONEXION, devuelve los datos almacenados en SQLite.
- */
 export const obtenerLineas = async (): Promise<RespuestaExitosa<Linea[]>> => {
   try {
     const res = await clienteHttp<Linea[]>("/lineas");
@@ -32,7 +32,7 @@ export const obtenerLineas = async (): Promise<RespuestaExitosa<Linea[]>> => {
     }
     return res;
   } catch (error) {
-    if (esErrorDeConexion(error)) {
+    if (esErrorResiliente(error)) {
       const lineasCache = await obtenerLineasDeCache();
       if (lineasCache.length > 0) {
         return {
@@ -49,10 +49,6 @@ export const obtenerLineas = async (): Promise<RespuestaExitosa<Linea[]>> => {
   }
 };
 
-/**
- * Obtiene el detalle de una línea por su ID (ej: "lin-05").
- * Ante pérdida de conectividad, intenta resolverla desde la tabla local cache_lineas.
- */
 export const obtenerLineaPorId = async (
   id: string,
 ): Promise<RespuestaExitosa<Linea>> => {
@@ -60,7 +56,7 @@ export const obtenerLineaPorId = async (
     const res = await clienteHttp<Linea>(`/lineas/${encodeURIComponent(id)}`);
     return res;
   } catch (error) {
-    if (esErrorDeConexion(error)) {
+    if (esErrorResiliente(error)) {
       const lineaCache = await obtenerLineaPorIdDeCache(id);
       if (lineaCache) {
         return { datos: lineaCache, meta: null };
@@ -70,23 +66,64 @@ export const obtenerLineaPorId = async (
   }
 };
 
-/**
- * Obtiene la lista de avisos del sistema (vigentes por defecto).
- */
-export const obtenerAvisos = (
+export const obtenerAvisos = async (
   estado: "vigentes" | "proximos" | "todos" = "vigentes",
   lineaId?: string,
-): Promise<RespuestaExitosa<Aviso[]>> => {
+): Promise<RespuestaExitosa<Aviso[]> & { desdeCache?: boolean }> => {
   const params = new URLSearchParams();
   params.set("estado", estado);
   if (lineaId) params.set("lineaId", lineaId);
 
-  return clienteHttp<Aviso[]>(`/avisos?${params.toString()}`);
+  try {
+    const res = await clienteHttp<Aviso[]>(`/avisos?${params.toString()}`);
+    if (res.datos && res.datos.length > 0 && !lineaId) {
+      const ahoraIso = new Date().toISOString();
+      Promise.all([
+        Storage.setItem(CLAVE_CACHE_AVISOS, JSON.stringify(res.datos)),
+        Storage.setItem(CLAVE_CACHE_AVISOS_FECHA, ahoraIso),
+      ]).catch(() => {});
+    }
+    return { ...res, desdeCache: false };
+  } catch (error) {
+    if (esErrorResiliente(error)) {
+      let listaAvisos: Aviso[] = AVISOS_MOCK;
+      try {
+        const guardado = await Storage.getItem(CLAVE_CACHE_AVISOS);
+        if (guardado) {
+          const parsed = JSON.parse(guardado);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            listaAvisos = parsed as Aviso[];
+          }
+        }
+      } catch {
+      }
+
+      if (lineaId) {
+        listaAvisos = listaAvisos.filter((a) => a.lineaIds.includes(lineaId));
+      }
+
+      return {
+        datos: listaAvisos,
+        meta: {
+          total: listaAvisos.length,
+          pagina: 1,
+          porPagina: listaAvisos.length,
+        },
+        desdeCache: true,
+      };
+    }
+    throw error;
+  }
 };
 
-/**
- * Retorna el aviso vigente (desvío o alerta) para una línea dada.
- */
+export async function obtenerUltimaActualizacionAvisos(): Promise<string | null> {
+  try {
+    return await Storage.getItem(CLAVE_CACHE_AVISOS_FECHA);
+  } catch {
+    return null;
+  }
+}
+
 export async function obtenerAvisoVigentePorLinea(
   lineaId: string,
 ): Promise<Aviso | null> {
@@ -94,7 +131,6 @@ export async function obtenerAvisoVigentePorLinea(
     const res = await obtenerAvisos("vigentes", lineaId);
     if (!res.datos || res.datos.length === 0) return null;
 
-    // Priorizamos desvíos sobre informativos
     const desvio = res.datos.find((a) => a.gravedad === "desvio");
     return desvio ?? res.datos[0] ?? null;
   } catch {

@@ -1,11 +1,8 @@
 import type { Aviso } from "../types";
-import { obtenerAvisos } from "./lineas.service";
+import { obtenerAvisos, obtenerUltimaActualizacionAvisos } from "./lineas.service";
 
 export type FiltroAvisos = "vigentes" | "mis_lineas" | "vencidos";
 
-/**
- * Filtra una lista de avisos según el filtro seleccionado.
- */
 export function filtrarAvisos(
   avisos: Aviso[],
   filtro: FiltroAvisos,
@@ -36,10 +33,6 @@ export function filtrarAvisos(
   });
 }
 
-/**
- * Formatea el rango de fechas para la cabecera de la tarjeta del aviso.
- * Ej: "14/9 al 5/10" o "Sin fecha de fin".
- */
 export function formatearRangoFechas(
   desdeIso: string,
   hastaIso: string | null,
@@ -60,15 +53,19 @@ export function formatearRangoFechas(
   return `${diaDesde}/${mesDesde} al ${diaHasta}/${mesHasta}`;
 }
 
-/**
- * Formatea el tiempo transcurrido desde la última actualización de la lista.
- * Ej: "Actualizado hace 3 min".
- */
-export function formatearTiempoActualizacion(minutosAtras = 3): string {
+export function formatearTiempoActualizacion(
+  minutosAtras = 0,
+  desdeCache = false,
+): string {
+  const prefijo = desdeCache ? "Datos sin conexión · " : "";
   if (minutosAtras <= 0) {
-    return "Actualizado recién";
+    return `${prefijo}Actualizado recién`;
   }
-  return `Actualizado hace ${minutosAtras} min`;
+  if (minutosAtras >= 60) {
+    const horas = Math.floor(minutosAtras / 60);
+    return `${prefijo}Actualizado hace ${horas} h`;
+  }
+  return `${prefijo}Actualizado hace ${minutosAtras} min`;
 }
 
-export { obtenerAvisos };
+export { obtenerAvisos, obtenerUltimaActualizacionAvisos };

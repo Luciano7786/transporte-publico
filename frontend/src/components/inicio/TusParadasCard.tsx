@@ -38,7 +38,6 @@ export const TusParadasCard: React.FC<TusParadasCardProps> = ({
         },
       ]}
     >
-      {/* Encabezado: "Tus paradas" y distancia */}
       <View style={styles.headerRow}>
         <View style={styles.titleColumn}>
           <Text style={[styles.subtitulo, { color: paleta.textoBajo }]}>
@@ -53,7 +52,6 @@ export const TusParadasCard: React.FC<TusParadasCardProps> = ({
         </Text>
       </View>
 
-      {/* Filas de Líneas y horarios */}
       <View style={styles.lineasContainer}>
         {lineas.map((linea) => {
           const proximo = linea.proximos[0] ?? "--:--";
@@ -61,14 +59,12 @@ export const TusParadasCard: React.FC<TusParadasCardProps> = ({
 
           return (
             <View key={linea.numero} style={styles.lineaRow}>
-              {/* Badge de número de línea */}
               <View
                 style={[styles.lineaBadge, { backgroundColor: linea.color }]}
               >
                 <Text style={styles.lineaNumero}>{linea.numero}</Text>
               </View>
 
-              {/* Horarios */}
               <View style={styles.horariosRow}>
                 <Text
                   style={[styles.horarioPrincipal, { color: paleta.textoAlto }]}
@@ -92,7 +88,6 @@ export const TusParadasCard: React.FC<TusParadasCardProps> = ({
         })}
       </View>
 
-      {/* Pie de tarjeta */}
       <Text style={[styles.footerText, { color: paleta.textoBajo }]}>
         Horarios según tabla
       </Text>
