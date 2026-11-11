@@ -55,7 +55,7 @@ export function AvisosScreen() {
       setErrorCarga(null);
 
       const [resAvisos, resLineas, fechaGuardada] = await Promise.allSettled([
-        obtenerAvisos("todos"),
+        obtenerAvisos("vigentes"),
         obtenerLineas(),
         obtenerUltimaActualizacionAvisos(),
       ]);
