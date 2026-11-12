@@ -3,7 +3,7 @@ import { Platform } from "react-native";
 import { LINEAS_MOCK } from "../mocks/lineas.mock";
 import { HORARIOS_MOCK } from "../mocks/horarios.mock";
 import { PARADAS_MOCK } from "../mocks/paradas.mock";
-import type { Horario, Linea, MotivoDemora, Parada, Sentido } from "../types";
+import type { Horario, Linea, MotivoDemora, Parada } from "../types";
 
 const NOMBRE_BASE_DATOS = "transporte_parana.db";
 

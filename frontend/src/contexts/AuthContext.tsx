@@ -92,8 +92,8 @@ async function borrarSesionGuardada() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [restaurando, setRestaurando] = useState(true);
-  const [lineasFavLocales, setLineasFavLocales] = useState<string[]>([]);
-  const [paradasFavLocales, setParadasFavLocales] = useState<string[]>([]);
+  const [, setLineasFavLocales] = useState<string[]>([]);
+  const [, setParadasFavLocales] = useState<string[]>([]);
   const [biometriaHabilitada, setBiometriaHabilitadaState] =
     useState<boolean>(false);
   const [biometriaDisponible, setBiometriaDisponible] =
