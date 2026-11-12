@@ -1,9 +1,6 @@
 import React, { useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
-
-export const ComponentesMapaNativo = { MapView, Marker, Polyline };
 
 export interface PuntoMapa {
   id: string;
