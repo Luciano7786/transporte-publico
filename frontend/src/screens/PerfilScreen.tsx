@@ -84,12 +84,13 @@ export function PerfilScreen() {
   };
 
   const handleToggleBiometria = async (valor: boolean) => {
+    if (!auth?.usuario) return;
     if (valor) {
       const ok = await auth?.autenticarConBiometria();
       if (!ok) {
         Alert.alert(
-          "Biometría no verificada",
-          "No se pudo verificar tu huella o rostro para activar el acceso rápido.",
+          "Huella no verificada",
+          "No se pudo verificar tu huella digital para activar el acceso rápido.",
         );
         return;
       }
@@ -121,6 +122,7 @@ export function PerfilScreen() {
 
   return (
     <SafeAreaView
+      edges={["top", "left", "right"]}
       style={[styles.safeArea, { backgroundColor: paleta.fondoApp }]}
     >
       <View style={styles.header}>
@@ -305,189 +307,193 @@ export function PerfilScreen() {
           </View>
         </View>
 
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: paleta.superficie1,
-              borderColor: paleta.borde,
-            },
-          ]}
-        >
-          <Text style={[styles.sectionTitle, { color: paleta.textoAlto }]}>
-            Avisos y Seguridad
-          </Text>
+        {auth?.usuario ? (
+          <>
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: paleta.superficie1,
+                  borderColor: paleta.borde,
+                },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: paleta.textoAlto }]}>
+                Avisos y Seguridad
+              </Text>
 
-          <View style={styles.switchRow}>
-            <View style={styles.switchTexts}>
-              <Text style={[styles.switchLabel, { color: paleta.textoAlto }]}>
-                Notificaciones de mis líneas
-              </Text>
-              <Text style={[styles.switchSub, { color: paleta.textoMedio }]}>
-                Recibir alertas cuando una línea favorita tiene un desvío nuevo
-              </Text>
+              <View style={styles.switchRow}>
+                <View style={styles.switchTexts}>
+                  <Text style={[styles.switchLabel, { color: paleta.textoAlto }]}>
+                    Notificaciones de mis líneas
+                  </Text>
+                  <Text style={[styles.switchSub, { color: paleta.textoMedio }]}>
+                    Recibir alertas cuando una línea favorita tiene un desvío nuevo
+                  </Text>
+                </View>
+                <Switch
+                  value={avisosActivosLocal}
+                  onValueChange={handleToggleAvisos}
+                  trackColor={{ false: paleta.borde, true: paleta.acento }}
+                />
+              </View>
+
+              <View
+                style={[
+                  styles.switchRow,
+                  {
+                    borderTopWidth: 1,
+                    borderTopColor: paleta.borde,
+                    paddingTop: 12,
+                    marginTop: 12,
+                  },
+                ]}
+              >
+                <View style={styles.switchTexts}>
+                  <Text style={[styles.switchLabel, { color: paleta.textoAlto }]}>
+                    Reingreso con huella digital
+                  </Text>
+                  <Text style={[styles.switchSub, { color: paleta.textoMedio }]}>
+                    {auth?.biometriaDisponible
+                      ? "Desbloqueo rápido con huella digital para tu cuenta"
+                      : "Configurá una huella digital en tu dispositivo para usarla"}
+                  </Text>
+                </View>
+                <Switch
+                  value={Boolean(auth?.biometriaHabilitada)}
+                  onValueChange={handleToggleBiometria}
+                  disabled={!auth?.biometriaDisponible}
+                  trackColor={{ false: paleta.borde, true: paleta.acento }}
+                />
+              </View>
             </View>
-            <Switch
-              value={avisosActivosLocal}
-              onValueChange={handleToggleAvisos}
-              trackColor={{ false: paleta.borde, true: paleta.acento }}
-            />
-          </View>
 
-          <View
-            style={[
-              styles.switchRow,
-              {
-                borderTopWidth: 1,
-                borderTopColor: paleta.borde,
-                paddingTop: 12,
-                marginTop: 12,
-              },
-            ]}
-          >
-            <View style={styles.switchTexts}>
-              <Text style={[styles.switchLabel, { color: paleta.textoAlto }]}>
-                Reingreso con huella o rostro
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: paleta.superficie1,
+                  borderColor: paleta.borde,
+                },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: paleta.textoAlto }]}>
+                Mis Líneas Favoritas ({lineasFavObjetos.length})
               </Text>
-              <Text style={[styles.switchSub, { color: paleta.textoMedio }]}>
-                {auth?.biometriaDisponible
-                  ? "Desbloqueo biométrico rápido para tu cuenta"
-                  : "Configurá huella o rostro en tu dispositivo para usarlo"}
-              </Text>
-            </View>
-            <Switch
-              value={Boolean(auth?.biometriaHabilitada)}
-              onValueChange={handleToggleBiometria}
-              disabled={!auth?.biometriaDisponible}
-              trackColor={{ false: paleta.borde, true: paleta.acento }}
-            />
-          </View>
-        </View>
 
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: paleta.superficie1,
-              borderColor: paleta.borde,
-            },
-          ]}
-        >
-          <Text style={[styles.sectionTitle, { color: paleta.textoAlto }]}>
-            Mis Líneas Favoritas ({lineasFavObjetos.length})
-          </Text>
-
-          {lineasFavObjetos.length === 0 ? (
-            <Text style={[styles.emptyFavText, { color: paleta.textoMedio }]}>
-              Todavía no marcaste líneas como favoritas. Tocá la estrella en el
-              detalle de cualquier línea.
-            </Text>
-          ) : (
-            <View style={styles.favList}>
-              {lineasFavObjetos.map((l) => (
-                <TouchableOpacity
-                  key={l.id}
-                  activeOpacity={0.75}
-                  onPress={() =>
-                    navigation.navigate("LineaDetalle", { lineaId: l.id })
-                  }
-                  style={[
-                    styles.favItem,
-                    {
-                      backgroundColor: paleta.fondoApp,
-                      borderColor: paleta.borde,
-                    },
-                  ]}
-                >
-                  <View style={styles.favItemLeft}>
-                    <View
+              {lineasFavObjetos.length === 0 ? (
+                <Text style={[styles.emptyFavText, { color: paleta.textoMedio }]}>
+                  Todavía no marcaste líneas como favoritas. Tocá la estrella en el
+                  detalle de cualquier línea.
+                </Text>
+              ) : (
+                <View style={styles.favList}>
+                  {lineasFavObjetos.map((l) => (
+                    <TouchableOpacity
+                      key={l.id}
+                      activeOpacity={0.75}
+                      onPress={() =>
+                        navigation.navigate("LineaDetalle", { lineaId: l.id })
+                      }
                       style={[
-                        styles.lineaBadge,
-                        { backgroundColor: l.color || "#1B6CA8" },
+                        styles.favItem,
+                        {
+                          backgroundColor: paleta.fondoApp,
+                          borderColor: paleta.borde,
+                        },
                       ]}
                     >
-                      <Text style={styles.lineaBadgeTexto}>{l.numero}</Text>
-                    </View>
-                    <Text
-                      style={[styles.favItemTitle, { color: paleta.textoAlto }]}
-                      numberOfLines={1}
-                    >
-                      {l.nombre}
-                    </Text>
-                  </View>
+                      <View style={styles.favItemLeft}>
+                        <View
+                          style={[
+                            styles.lineaBadge,
+                            { backgroundColor: l.color || "#1B6CA8" },
+                          ]}
+                        >
+                          <Text style={styles.lineaBadgeTexto}>{l.numero}</Text>
+                        </View>
+                        <Text
+                          style={[styles.favItemTitle, { color: paleta.textoAlto }]}
+                          numberOfLines={1}
+                        >
+                          {l.nombre}
+                        </Text>
+                      </View>
 
-                  <TouchableOpacity
-                    onPress={() => auth?.alternarLineaFavorita(l.id)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="star" size={20} color="#F59E0B" />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
+                      <TouchableOpacity
+                        onPress={() => auth?.alternarLineaFavorita(l.id)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="star" size={20} color="#F59E0B" />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
-          )}
-        </View>
 
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: paleta.superficie1,
-              borderColor: paleta.borde,
-            },
-          ]}
-        >
-          <Text style={[styles.sectionTitle, { color: paleta.textoAlto }]}>
-            Mis Paradas Favoritas ({paradasFavObjetos.length})
-          </Text>
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: paleta.superficie1,
+                  borderColor: paleta.borde,
+                },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: paleta.textoAlto }]}>
+                Mis Paradas Favoritas ({paradasFavObjetos.length})
+              </Text>
 
-          {paradasFavObjetos.length === 0 ? (
-            <Text style={[styles.emptyFavText, { color: paleta.textoMedio }]}>
-              Todavía no guardaste paradas favoritas. Tocá la estrella al abrir
-              una parada en el mapa.
-            </Text>
-          ) : (
-            <View style={styles.favList}>
-              {paradasFavObjetos.map((p) => (
-                <TouchableOpacity
-                  key={p.id}
-                  activeOpacity={0.75}
-                  onPress={() =>
-                    navigation.navigate("ParadaDetalle", { paradaId: p.id })
-                  }
-                  style={[
-                    styles.favItem,
-                    {
-                      backgroundColor: paleta.fondoApp,
-                      borderColor: paleta.borde,
-                    },
-                  ]}
-                >
-                  <View style={styles.favItemLeft}>
-                    <Ionicons
-                      name="location-outline"
-                      size={20}
-                      color={paleta.acento}
-                    />
-                    <Text
-                      style={[styles.favItemTitle, { color: paleta.textoAlto }]}
-                      numberOfLines={1}
+              {paradasFavObjetos.length === 0 ? (
+                <Text style={[styles.emptyFavText, { color: paleta.textoMedio }]}>
+                  Todavía no guardaste paradas favoritas. Tocá la estrella al abrir
+                  una parada en el mapa.
+                </Text>
+              ) : (
+                <View style={styles.favList}>
+                  {paradasFavObjetos.map((p) => (
+                    <TouchableOpacity
+                      key={p.id}
+                      activeOpacity={0.75}
+                      onPress={() =>
+                        navigation.navigate("ParadaDetalle", { paradaId: p.id })
+                      }
+                      style={[
+                        styles.favItem,
+                        {
+                          backgroundColor: paleta.fondoApp,
+                          borderColor: paleta.borde,
+                        },
+                      ]}
                     >
-                      {p.nombre}
-                    </Text>
-                  </View>
+                      <View style={styles.favItemLeft}>
+                        <Ionicons
+                          name="location-outline"
+                          size={20}
+                          color={paleta.acento}
+                        />
+                        <Text
+                          style={[styles.favItemTitle, { color: paleta.textoAlto }]}
+                          numberOfLines={1}
+                        >
+                          {p.nombre}
+                        </Text>
+                      </View>
 
-                  <TouchableOpacity
-                    onPress={() => auth?.alternarParadaFavorita(p.id)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="star" size={20} color="#F59E0B" />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
+                      <TouchableOpacity
+                        onPress={() => auth?.alternarParadaFavorita(p.id)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="star" size={20} color="#F59E0B" />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
-          )}
-        </View>
+          </>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );

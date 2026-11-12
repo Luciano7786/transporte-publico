@@ -1,6 +1,6 @@
 import { useNavigation, useRoute } from "@react-navigation/native";
 import React, { useContext, useEffect, useState } from "react";
-import { ScrollView, StyleSheet } from "react-native";
+import { Alert, ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LineaAvisoBanner } from "../components/linea/LineaAvisoBanner";
 import { LineaHeader } from "../components/linea/LineaHeader";
@@ -181,7 +181,23 @@ export function LineaDetalleScreen() {
             navigation.navigate("MainTabs");
           }
         }}
-        onToggleFavorita={() => auth?.alternarLineaFavorita(linea.id)}
+        onToggleFavorita={() => {
+          if (!auth?.usuario) {
+            Alert.alert(
+              "Iniciá sesión",
+              "Necesitás tener una cuenta e iniciar sesión para guardar líneas favoritas.",
+              [
+                { text: "Cancelar", style: "cancel" },
+                {
+                  text: "Iniciar sesión",
+                  onPress: () => navigation.navigate("Login"),
+                },
+              ],
+            );
+            return;
+          }
+          auth.alternarLineaFavorita(linea.id);
+        }}
       />
 
       <ScrollView

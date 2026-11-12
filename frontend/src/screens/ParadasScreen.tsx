@@ -50,32 +50,33 @@ export function ParadasScreen() {
   ]);
 
   const paradaDestacada = useMemo(() => {
-    if (paradas.length === 0) return null;
+    if (!auth?.usuario) return null;
 
-    const idsFavoritas = auth?.paradasFavoritas ?? [];
+    const idsFavoritas = auth.paradasFavoritas ?? [];
+    if (idsFavoritas.length === 0 || paradas.length === 0) return null;
+
     const favoritasDisponibles = paradas.filter((p) =>
       idsFavoritas.includes(p.id),
     );
-    const pool =
-      favoritasDisponibles.length > 0 ? favoritasDisponibles : paradas;
+    if (favoritasDisponibles.length === 0) return null;
 
-    let elegida = pool[0];
+    let elegida = favoritasDisponibles[0];
     let menorDist = calcularDistanciaMetros(usuarioCoords, elegida.coordenadas);
 
-    for (let i = 1; i < pool.length; i++) {
-      const dist = calcularDistanciaMetros(usuarioCoords, pool[i].coordenadas);
+    for (let i = 1; i < favoritasDisponibles.length; i++) {
+      const dist = calcularDistanciaMetros(usuarioCoords, favoritasDisponibles[i].coordenadas);
       if (dist < menorDist) {
         menorDist = dist;
-        elegida = pool[i];
+        elegida = favoritasDisponibles[i];
       }
     }
 
     return {
       parada: elegida,
       distanciaMetros: menorDist,
-      esFavorita: idsFavoritas.includes(elegida.id),
+      esFavorita: true,
     };
-  }, [paradas, usuarioCoords, auth?.paradasFavoritas]);
+  }, [paradas, usuarioCoords, auth?.usuario, auth?.paradasFavoritas]);
 
   const paradasFiltradas = useMemo(() => {
     const termino = busqueda.trim().toLowerCase();
@@ -114,7 +115,7 @@ export function ParadasScreen() {
 
             notificarNuevosAvisosEnLineasFavoritas(
               listaAvisos,
-              auth?.lineasFavoritas ?? ["lin-05", "lin-14"],
+              auth?.lineasFavoritas ?? [],
               auth?.usuario?.avisosActivos ?? true,
             ).catch(() => {});
           }
@@ -211,6 +212,7 @@ export function ParadasScreen() {
 
   return (
     <SafeAreaView
+      edges={["top", "left", "right"]}
       style={[
         styles.safeArea,
         {
@@ -303,16 +305,14 @@ export function ParadasScreen() {
         </View>
       ) : (
         <>
-          <TusParadasCard
-            nombreParada={paradaDestacada?.parada.nombre ?? "Alameda y Urquiza"}
-            distancia={
-              paradaDestacada
-                ? formatearDistancia(paradaDestacada.distanciaMetros)
-                : "a 120 m"
-            }
-            lineas={lineasCard}
-            onPress={() => handleParadaPress(paradaDestacada?.parada)}
-          />
+          {paradaDestacada ? (
+            <TusParadasCard
+              nombreParada={paradaDestacada.parada.nombre}
+              distancia={formatearDistancia(paradaDestacada.distanciaMetros)}
+              lineas={lineasCard}
+              onPress={() => handleParadaPress(paradaDestacada.parada)}
+            />
+          ) : null}
 
           <AvisosHoyCard
             titulo="Avisos de hoy"

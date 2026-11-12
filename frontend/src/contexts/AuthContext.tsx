@@ -13,6 +13,7 @@ import Storage from "expo-sqlite/kv-store";
 import type { Tema, Usuario } from "../types";
 import {
   actualizarPerfilServicio,
+  actualizarUsuarioEnCuentasLocales,
   agregarLineaFavoritaServicio,
   agregarParadaFavoritaServicio,
   eliminarLineaFavoritaServicio,
@@ -25,8 +26,10 @@ import { registrarDispositivoPushEnServidor } from "../services/notificaciones.s
 
 const CLAVE_TOKEN = "sesion.token";
 const CLAVE_USUARIO = "sesion.usuario";
-const CLAVE_LINEAS_FAV_LOCAL = "favoritos.lineas";
-const CLAVE_PARADAS_FAV_LOCAL = "favoritos.paradas";
+const CLAVE_TOKEN_BIOMETRIA = "sesion.token.huella";
+const CLAVE_USUARIO_BIOMETRIA = "sesion.usuario.huella";
+const CLAVE_LINEAS_FAV_LOCAL = "favoritos.lineas.v2";
+const CLAVE_PARADAS_FAV_LOCAL = "favoritos.paradas.v2";
 const CLAVE_BIOMETRIA = "seguridad.biometria";
 
 export interface AuthContextValue {
@@ -36,7 +39,9 @@ export interface AuthContextValue {
   paradasFavoritas: string[];
   biometriaHabilitada: boolean;
   biometriaDisponible: boolean;
+  tieneSesionBiometricaGuardada: boolean;
   iniciarSesion: (email: string, contrasenia: string) => Promise<void>;
+  iniciarSesionConHuella: () => Promise<boolean>;
   registrarse: (
     nombre: string,
     email: string,
@@ -87,16 +92,13 @@ async function borrarSesionGuardada() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [restaurando, setRestaurando] = useState(true);
-  const [lineasFavLocales, setLineasFavLocales] = useState<string[]>([
-    "lin-05",
-    "lin-14",
-  ]);
-  const [paradasFavLocales, setParadasFavLocales] = useState<string[]>([
-    "par-101",
-  ]);
+  const [lineasFavLocales, setLineasFavLocales] = useState<string[]>([]);
+  const [paradasFavLocales, setParadasFavLocales] = useState<string[]>([]);
   const [biometriaHabilitada, setBiometriaHabilitadaState] =
     useState<boolean>(false);
   const [biometriaDisponible, setBiometriaDisponible] =
+    useState<boolean>(false);
+  const [tieneSesionBiometricaGuardada, setTieneSesionBiometricaGuardada] =
     useState<boolean>(false);
 
   useEffect(() => {
@@ -104,26 +106,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function restaurar() {
       try {
-        const tieneHardware = await LocalAuthentication.hasHardwareAsync().catch(
-          () => false,
-        );
-        const tieneRegistros = await LocalAuthentication.isEnrolledAsync().catch(
-          () => false,
+        const [tieneHardware, tieneRegistros, tiposSoportados] =
+          await Promise.all([
+            LocalAuthentication.hasHardwareAsync().catch(() => false),
+            LocalAuthentication.isEnrolledAsync().catch(() => false),
+            LocalAuthentication.supportedAuthenticationTypesAsync().catch(
+              () => [] as LocalAuthentication.AuthenticationType[],
+            ),
+          ]);
+        const soportaHuella = tiposSoportados.includes(
+          LocalAuthentication.AuthenticationType.FINGERPRINT,
         );
         if (!cancelado) {
-          setBiometriaDisponible(tieneHardware && tieneRegistros);
+          setBiometriaDisponible(
+            tieneHardware && tieneRegistros && soportaHuella,
+          );
         }
 
-        const [favLineasRaw, favParadasRaw, bioRaw] = await Promise.all([
+        const [
+          favLineasRaw,
+          favParadasRaw,
+          bioRaw,
+          tokenBioGuardado,
+          usuarioBioRaw,
+        ] = await Promise.all([
           Storage.getItem(CLAVE_LINEAS_FAV_LOCAL).catch(() => null),
           Storage.getItem(CLAVE_PARADAS_FAV_LOCAL).catch(() => null),
           Storage.getItem(CLAVE_BIOMETRIA).catch(() => null),
+          SecureStore.getItemAsync(CLAVE_TOKEN_BIOMETRIA).catch(() => null),
+          Storage.getItem(CLAVE_USUARIO_BIOMETRIA).catch(() => null),
         ]);
 
         if (!cancelado) {
-          setLineasFavLocales(leerListaGuardada(favLineasRaw, ["lin-05", "lin-14"]));
-          setParadasFavLocales(leerListaGuardada(favParadasRaw, ["par-101"]));
+          setLineasFavLocales(leerListaGuardada(favLineasRaw, []));
+          setParadasFavLocales(leerListaGuardada(favParadasRaw, []));
           setBiometriaHabilitadaState(bioRaw === "true");
+          setTieneSesionBiometricaGuardada(
+            Boolean(tokenBioGuardado && leerUsuarioGuardado(usuarioBioRaw)),
+          );
         }
 
         const token = await SecureStore.getItemAsync(CLAVE_TOKEN).catch(
@@ -176,10 +196,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await SecureStore.setItem(CLAVE_TOKEN, datos.token);
       await Storage.setItem(CLAVE_USUARIO, JSON.stringify(datos.usuario));
+      if (biometriaHabilitada) {
+        await SecureStore.setItemAsync(CLAVE_TOKEN_BIOMETRIA, datos.token).catch(
+          () => {},
+        );
+        await Storage.setItem(
+          CLAVE_USUARIO_BIOMETRIA,
+          JSON.stringify(datos.usuario),
+        ).catch(() => {});
+        setTieneSesionBiometricaGuardada(true);
+      }
       setUsuario(datos.usuario);
       registrarDispositivoPushEnServidor().catch(() => {});
     },
-    [],
+    [biometriaHabilitada],
   );
 
   const registrarse = useCallback(
@@ -201,6 +231,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await SecureStore.setItem(CLAVE_TOKEN, datos.token);
       await Storage.setItem(CLAVE_USUARIO, JSON.stringify(datos.usuario));
+      setBiometriaHabilitadaState(false);
+      await Storage.setItem(CLAVE_BIOMETRIA, "false").catch(() => {});
+      await SecureStore.deleteItemAsync(CLAVE_TOKEN_BIOMETRIA).catch(() => {});
+      await Storage.removeItem(CLAVE_USUARIO_BIOMETRIA).catch(() => {});
+      setTieneSesionBiometricaGuardada(false);
       setUsuario(datos.usuario);
       registrarDispositivoPushEnServidor().catch(() => {});
     },
@@ -216,13 +251,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const lineasFavoritas = useMemo(
-    () => (usuario ? usuario.lineasFavoritas : lineasFavLocales),
-    [usuario, lineasFavLocales],
+    () => (usuario ? usuario.lineasFavoritas : []),
+    [usuario],
   );
 
   const paradasFavoritas = useMemo(
-    () => (usuario ? usuario.paradasFavoritas : paradasFavLocales),
-    [usuario, paradasFavLocales],
+    () => (usuario ? usuario.paradasFavoritas : []),
+    [usuario],
   );
 
   const alternarLineaFavorita = useCallback(
@@ -242,6 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           CLAVE_USUARIO,
           JSON.stringify(usuarioActualizado),
         ).catch(() => {});
+        await actualizarUsuarioEnCuentasLocales(usuarioActualizado);
 
         try {
           if (yaEsFavorita) {
@@ -254,6 +290,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 CLAVE_USUARIO,
                 JSON.stringify(res.datos),
               ).catch(() => {});
+              await actualizarUsuarioEnCuentasLocales(res.datos);
             }
           }
         } catch {
@@ -286,6 +323,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           CLAVE_USUARIO,
           JSON.stringify(usuarioActualizado),
         ).catch(() => {});
+        await actualizarUsuarioEnCuentasLocales(usuarioActualizado);
 
         try {
           if (yaEsFavorita) {
@@ -298,6 +336,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 CLAVE_USUARIO,
                 JSON.stringify(res.datos),
               ).catch(() => {});
+              await actualizarUsuarioEnCuentasLocales(res.datos);
             }
           }
         } catch {
@@ -329,6 +368,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await Storage.setItem(CLAVE_USUARIO, JSON.stringify(actualizado)).catch(
         () => {},
       );
+      await actualizarUsuarioEnCuentasLocales(actualizado);
 
       try {
         const res = await actualizarPerfilServicio(cambios);
@@ -338,6 +378,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             CLAVE_USUARIO,
             JSON.stringify(res.datos),
           ).catch(() => {});
+          await actualizarUsuarioEnCuentasLocales(res.datos);
         }
       } catch {
       }
@@ -345,17 +386,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [usuario],
   );
 
-  const setBiometriaHabilitada = useCallback(async (activa: boolean) => {
-    setBiometriaHabilitadaState(activa);
-    await Storage.setItem(CLAVE_BIOMETRIA, activa ? "true" : "false").catch(
-      () => {},
-    );
-  }, []);
+  const setBiometriaHabilitada = useCallback(
+    async (activa: boolean) => {
+      if (!usuario) return;
+      setBiometriaHabilitadaState(activa);
+      await Storage.setItem(CLAVE_BIOMETRIA, activa ? "true" : "false").catch(
+        () => {},
+      );
+
+      if (activa) {
+        const tokenActual = await SecureStore.getItemAsync(CLAVE_TOKEN).catch(
+          () => null,
+        );
+        if (tokenActual) {
+          await SecureStore.setItemAsync(CLAVE_TOKEN_BIOMETRIA, tokenActual).catch(
+            () => {},
+          );
+        }
+        await Storage.setItem(
+          CLAVE_USUARIO_BIOMETRIA,
+          JSON.stringify(usuario),
+        ).catch(() => {});
+        setTieneSesionBiometricaGuardada(true);
+      } else {
+        await SecureStore.deleteItemAsync(CLAVE_TOKEN_BIOMETRIA).catch(
+          () => {},
+        );
+        await Storage.removeItem(CLAVE_USUARIO_BIOMETRIA).catch(() => {});
+        setTieneSesionBiometricaGuardada(false);
+      }
+    },
+    [usuario],
+  );
 
   const autenticarConBiometria = useCallback(async (): Promise<boolean> => {
     try {
       const resultado = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Ingresá con tu huella o rostro a Transporte Paraná",
+        promptMessage: "Ingresá con tu huella digital a Transporte Paraná",
         cancelLabel: "Usar contraseña",
         fallbackLabel: "Usar código del teléfono",
       });
@@ -365,6 +432,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const iniciarSesionConHuella = useCallback(async (): Promise<boolean> => {
+    if (!biometriaDisponible || !biometriaHabilitada) return false;
+
+    const [tokenBio, usuarioBioRaw] = await Promise.all([
+      SecureStore.getItemAsync(CLAVE_TOKEN_BIOMETRIA).catch(() => null),
+      Storage.getItem(CLAVE_USUARIO_BIOMETRIA).catch(() => null),
+    ]);
+    const usuarioGuardado = leerUsuarioGuardado(usuarioBioRaw);
+    if (!tokenBio || !usuarioGuardado) return false;
+
+    const ok = await autenticarConBiometria();
+    if (!ok) return false;
+
+    await SecureStore.setItem(CLAVE_TOKEN, tokenBio);
+    await Storage.setItem(CLAVE_USUARIO, JSON.stringify(usuarioGuardado));
+    setUsuario(usuarioGuardado);
+    obtenerPerfilServicio()
+      .then(async (res) => {
+        if (res.datos) {
+          setUsuario(res.datos);
+          await Storage.setItem(
+            CLAVE_USUARIO,
+            JSON.stringify(res.datos),
+          ).catch(() => {});
+          await Storage.setItem(
+            CLAVE_USUARIO_BIOMETRIA,
+            JSON.stringify(res.datos),
+          ).catch(() => {});
+        }
+      })
+      .catch(() => {});
+    return true;
+  }, [autenticarConBiometria, biometriaDisponible, biometriaHabilitada]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       usuario,
@@ -373,7 +474,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       paradasFavoritas,
       biometriaHabilitada,
       biometriaDisponible,
+      tieneSesionBiometricaGuardada,
       iniciarSesion,
+      iniciarSesionConHuella,
       registrarse,
       cerrarSesion,
       alternarLineaFavorita,
@@ -389,7 +492,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       paradasFavoritas,
       biometriaHabilitada,
       biometriaDisponible,
+      tieneSesionBiometricaGuardada,
       iniciarSesion,
+      iniciarSesionConHuella,
       registrarse,
       cerrarSesion,
       alternarLineaFavorita,

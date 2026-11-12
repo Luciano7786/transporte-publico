@@ -17,7 +17,6 @@ export const FiltrosAvisos: React.FC<FiltrosAvisosProps> = ({
   const opciones: Array<{ id: FiltroAvisos; label: string }> = [
     { id: "vigentes", label: "Vigentes" },
     { id: "mis_lineas", label: "Mis líneas" },
-    { id: "vencidos", label: "Vencidos" },
   ];
 
   return (

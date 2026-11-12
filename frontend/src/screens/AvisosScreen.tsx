@@ -55,7 +55,7 @@ export function AvisosScreen() {
       setErrorCarga(null);
 
       const [resAvisos, resLineas, fechaGuardada] = await Promise.allSettled([
-        obtenerAvisos("todos"),
+        obtenerAvisos("vigentes"),
         obtenerLineas(),
         obtenerUltimaActualizacionAvisos(),
       ]);
@@ -67,7 +67,7 @@ export function AvisosScreen() {
 
         notificarNuevosAvisosEnLineasFavoritas(
           resAvisos.value.datos,
-          auth?.lineasFavoritas ?? ["lin-05", "lin-14"],
+          auth?.lineasFavoritas ?? [],
           auth?.usuario?.avisosActivos ?? true,
         ).catch(() => {});
 
@@ -126,7 +126,7 @@ export function AvisosScreen() {
   const avisosFiltrados = filtrarAvisos(
     todosAvisos,
     filtroActual,
-    auth?.lineasFavoritas ?? ["lin-05", "lin-14"],
+    auth?.lineasFavoritas ?? [],
   );
 
   const handleOpenVideo = (videoUrl: string) => {
@@ -140,6 +140,7 @@ export function AvisosScreen() {
 
   return (
     <SafeAreaView
+      edges={["top", "left", "right"]}
       style={[styles.safeArea, { backgroundColor: paleta.fondoApp }]}
     >
       <AvisosHeader titulo="Avisos" />

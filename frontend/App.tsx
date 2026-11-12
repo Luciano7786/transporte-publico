@@ -13,6 +13,7 @@ import { ReportarDemoraScreen } from "./src/screens/ReportarDemoraScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import { EscanerQrScreen } from "./src/screens/EscanerQrScreen";
 import { inicializarBaseDeDatos } from "./src/db/database";
+import { asegurarCanalesNotificacionAndroid } from "./src/services/notificaciones.service";
 import { iniciarEscuchaRedYSincronizacion } from "./src/services/reportes.service";
 
 const Stack = createNativeStackNavigator();
@@ -51,6 +52,7 @@ function MainNavigation() {
 export default function App() {
   useEffect(() => {
     inicializarBaseDeDatos();
+    asegurarCanalesNotificacionAndroid().catch(() => {});
     const desuscribirRed = iniciarEscuchaRedYSincronizacion();
     return () => {
       desuscribirRed();

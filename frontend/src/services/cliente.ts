@@ -81,7 +81,10 @@ function traducirError(error: unknown): ErrorApi {
 const http = axios.create({
   baseURL: API_BASE_URL,
   timeout: TIEMPO_MAXIMO_MS,
-  headers: { Accept: "application/json" },
+  headers: {
+    Accept: "application/json",
+    "ngrok-skip-browser-warning": "true",
+  },
 });
 
 http.interceptors.request.use(async (config) => {

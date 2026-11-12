@@ -151,8 +151,8 @@ export const registrarseServicio = async (
         id: `usr-local-${Date.now()}`,
         nombre: nombreLimpio,
         email: emailNormalizado,
-        lineasFavoritas: ["lin-05", "lin-14"],
-        paradasFavoritas: ["par-101"],
+        lineasFavoritas: [],
+        paradasFavoritas: [],
         avisosActivos: true,
         tema: "sistema",
         contrasenia,
@@ -177,6 +177,24 @@ export const registrarseServicio = async (
             : "No se pudo registrar la cuenta. Revisá los datos ingresados.",
       },
     };
+  }
+};
+
+export const actualizarUsuarioEnCuentasLocales = async (
+  usuarioActualizado: Usuario,
+): Promise<void> => {
+  try {
+    const cuentas = await obtenerCuentasLocales();
+    const existente = cuentas.find(
+      (c) => c.email.toLowerCase() === usuarioActualizado.email.toLowerCase(),
+    );
+    if (existente) {
+      await guardarCuentaLocal({
+        ...existente,
+        ...usuarioActualizado,
+      });
+    }
+  } catch {
   }
 };
 
