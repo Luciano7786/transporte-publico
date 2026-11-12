@@ -1,14 +1,14 @@
 # API Transporte Público · Paraná
 
-Esta es la API que va a usar tu app del Trabajo Final de **Desarrollo para Móviles (UNER)**.
+Esta es la API del Trabajo Final de **Desarrollo para Móviles (UNER)**.
 Sale del pedido de Silvina Ferreyra, de la Dirección de Transporte de la Municipalidad de
 Paraná (`docs/prd.pdf`): líneas, paradas, horarios de tabla, avisos de desvío y reportes de
 demora de los pasajeros.
 
-Devuelve **exactamente** los tipos del PRD, los mismos que tenés en `src/tipos/`. Cuando
-cambies tus mocks por `fetch`, los datos encajan sin tocar los tipos. Los tipos que agrega la
+Devuelve **exactamente** los tipos del PRD, los mismos que se tiene en `src/tipos/`. Cuando
+se cambie los mocks por `fetch`, los datos encajan sin tocar los tipos. Los tipos que agrega la
 API (el sobre de las respuestas, la sesión, los archivos) están en
-[`contract/api.ts`](contract/api.ts): copialos a tu proyecto.
+[`contract/api.ts`](contract/api.ts).
 
 > **Estado:** la API está completa: red (líneas, paradas, búsqueda, cercanas y QR), horarios
 > (tabla, próximos y feriados), cuenta y favoritos, avisos con push, reportes de demora y la
