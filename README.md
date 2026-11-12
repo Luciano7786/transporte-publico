@@ -19,7 +19,7 @@ Aplicación móvil para consultar información útil del transporte público de 
 
 ## Entrega final
 
-- **Build Android (APK):** el enlace de EAS debe agregarse aquí una vez generado. La consigna solicita entregar el **link del build**; desde esa página se puede acceder al APK.
+- **Build Android (APK):** el enlace de EAS se agrega aca una vez generado. La consigna solicita entregar el **link del build**; desde esa página se puede acceder al APK.
 - **Código fuente:** [repositorio del proyecto](https://github.com/Luciano7786/transporte-publico).
 
 Para generar el build indicado por la consigna, desde `frontend`:
