@@ -1,14 +1,14 @@
 # API Transporte Público · Paraná
 
-Esta es la API que va a usar tu app del Trabajo Final de **Desarrollo para Móviles (UNER)**.
+Esta es la API de nuestra aplicación para el Trabajo Final de **Desarrollo para Móviles (UNER)**.
 Sale del pedido de Silvina Ferreyra, de la Dirección de Transporte de la Municipalidad de
 Paraná (`docs/prd.pdf`): líneas, paradas, horarios de tabla, avisos de desvío y reportes de
 demora de los pasajeros.
 
-Devuelve **exactamente** los tipos del PRD, los mismos que tenés en `src/tipos/`. Cuando
-cambies tus mocks por `fetch`, los datos encajan sin tocar los tipos. Los tipos que agrega la
-API (el sobre de las respuestas, la sesión, los archivos) están en
-[`contract/api.ts`](contract/api.ts): copialos a tu proyecto.
+Devuelve **exactamente** los tipos del PRD, los mismos que están en `src/tipos/`. Al reemplazar
+los mocks por `fetch`, los datos encajan sin modificar esos tipos. Los tipos que agrega la API
+(el sobre de las respuestas, la sesión y los archivos) están en
+[`contract/api.ts`](contract/api.ts).
 
 > **Estado:** la API está completa: red (líneas, paradas, búsqueda, cercanas y QR), horarios
 > (tabla, próximos y feriados), cuenta y favoritos, avisos con push, reportes de demora y la
@@ -32,17 +32,18 @@ La documentación completa, con ejemplos y todos los errores de cada endpoint, e
 
 ## 1. Con Docker: un solo comando (recomendado)
 
-Si tenés [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y
+Con [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y
 abierto, no hace falta instalar nada más. En la carpeta del proyecto:
 
 ```bash
 docker compose up
 ```
 
-La primera vez tarda unos minutos (arma la imagen). Cuando veas `La API está escuchando`,
-ya está: la base se crea sola y se cargan los datos de demo. Probá <http://localhost:3000/salud>.
+La primera vez tarda unos minutos (arma la imagen). Al aparecer `La API está escuchando`,
+la base se crea automáticamente y se cargan los datos de demo. La API puede verificarse en
+<http://localhost:3000/salud>.
 
-Si querés usar otro motor de base de datos:
+Para usar otro motor de base de datos:
 
 | Comando | Qué levanta |
 |---|---|
@@ -52,11 +53,11 @@ Si querés usar otro motor de base de datos:
 | `docker compose -f compose.mariadb.yaml up` | API + MariaDB 11 (en la compu, puerto 3308) |
 
 Las bases quedan publicadas en puertos que no son los de siempre, así no chocan con una base
-que ya tengas instalada. Las podés mirar con DBeaver (usuario `api`, contraseña `api`, base `api`).
+que ya esté instalada. Se pueden consultar con DBeaver (usuario `api`, contraseña `api`, base `api`).
 
-Las fotos y los videos se guardan, por defecto, en un volumen de Docker. Si querés probar con
-almacenamiento tipo Amazon S3 (como el que vas a usar publicado), sumá el emulador a cualquiera
-de los comandos de arriba:
+Las fotos y los videos se guardan, por defecto, en un volumen de Docker. Para probar con
+almacenamiento tipo Amazon S3 (como el que se usa en producción), se puede sumar el emulador a
+cualquiera de los comandos anteriores:
 
 ```bash
 docker compose -f compose.yaml -f compose.storage-s3.yaml up
@@ -73,11 +74,11 @@ variable `LOCALSTACK_AUTH_TOKEN`; con el de S3 alcanza.) La app no nota la difer
 
 ## 2. Sin Docker, con SQLite
 
-Necesitás **Node 24** y **pnpm**.
+Se necesita **Node 24** y **pnpm**.
 
-1. Instalá Node 24 desde <https://nodejs.org> (la versión LTS). Si usás `nvm`, en la carpeta
-   del proyecto alcanza con `nvm use`.
-2. Activá pnpm, que ya viene con Node: `corepack enable`.
+1. Instalar Node 24 desde <https://nodejs.org> (la versión LTS). Con `nvm`, alcanza con ejecutar
+   `nvm use` en la carpeta del proyecto.
+2. Activar pnpm, incluido con Node: `corepack enable`.
 
 Después, en la carpeta del proyecto:
 
@@ -88,17 +89,17 @@ pnpm dev
 ```
 
 `pnpm db:reiniciar` crea la base (un archivo en `datos/api.sqlite`) y carga los datos de
-demo. `pnpm dev` levanta la API en el puerto 3000 y se reinicia sola si cambiás algo.
+demo. `pnpm dev` levanta la API en el puerto 3000 y se reinicia automáticamente al cambiar el código.
 
-La configuración está en un archivo `.env`. Si no existe, se usan los valores por defecto;
-para cambiar algo, copiá `.env.example` como `.env` y editalo: cada variable tiene un
+La configuración está en un archivo `.env`. Si no existe, se usan los valores por defecto.
+Para cambiarla, se puede copiar `.env.example` como `.env` y editarlo: cada variable tiene un
 comentario que explica para qué sirve.
 
 ## 3. Sin Docker, con PostgreSQL, MySQL o MariaDB instalados
 
-1. Creá una base vacía (por ejemplo `transporte`), con el juego de caracteres `utf8mb4` si
+1. Crear una base vacía (por ejemplo `transporte`), con el juego de caracteres `utf8mb4` si
    es MySQL o MariaDB.
-2. En el `.env`, poné el motor y cómo conectarse:
+2. En el `.env`, indicá el motor y los datos de conexión:
 
    ```bash
    # PostgreSQL
@@ -116,35 +117,36 @@ comentario que explica para qué sirve.
 
 3. `pnpm db:reiniciar` y `pnpm dev`.
 
-> ⚠️ **XAMPP instala MariaDB, no MySQL**, aunque el panel diga "MySQL". Usá
+> ⚠️ **XAMPP instala MariaDB, no MySQL**, aunque el panel diga "MySQL". Configurá
 > `DB_MOTOR=mariadb`: con `mysql` contra un servidor MariaDB la API no queda estable.
 
-Si la contraseña tiene caracteres raros, escribilos con `%`: `@` → `%40`, `#` → `%23`,
+Si la contraseña tiene caracteres especiales, codificalos con `%`: `@` → `%40`, `#` → `%23`,
 `/` → `%2F`.
 
 ## 4. Conectarte desde el teléfono
 
-El teléfono con Expo Go **no llega a `localhost`**: `localhost` en el teléfono es el
-teléfono. Tiene que entrar por la IP de tu computadora.
+El teléfono con Expo Go **no llega a `localhost`**: `localhost` en el teléfono es el propio
+teléfono. La conexión debe realizarse mediante la IP de la computadora.
 
 1. El teléfono y la computadora tienen que estar en **la misma red wifi**.
 2. Al arrancar, la API imprime las direcciones que encontró, por ejemplo
    `Desde el teléfono (misma red wifi): http://192.168.0.10:3000`. Con Docker no las puede
-   ver: buscá la IP de tu computadora (en Windows `ipconfig`, en Mac y Linux
-   `ifconfig` o en la configuración de red) y usá esa.
-3. Abrí `http://<esa IP>:3000/salud` **en el navegador del teléfono**. Si ves
+   ver: consultar la IP de la computadora (en Windows `ipconfig`, en Mac y Linux
+   `ifconfig` o en la configuración de red) y usar esa dirección.
+3. Abrir `http://<esa IP>:3000/salud` **en el navegador del teléfono**. Si aparece
    `"estado":"ok"`, la app también va a llegar.
 4. Si no llega:
    - **Windows:** la primera vez que arranca, Windows pregunta si dejar pasar a Node por el
-     firewall. Tiene que estar permitido en **redes privadas**, y tu wifi tiene que estar
+     firewall. Debe estar permitido en **redes privadas**, y la wifi debe estar
      marcada como red privada.
-   - Los **antivirus** (Avast, ESET, Kaspersky…) suelen tener su propio firewall: permití
-     el puerto 3000 o probá desactivándolo un momento.
-   - Las redes de la facultad y algunas públicas aíslan los dispositivos entre sí. Probá
-     con el hotspot de tu teléfono.
+   - Los **antivirus** (Avast, ESET, Kaspersky…) suelen tener su propio firewall: habilitar
+     el puerto 3000 o verificá temporalmente si el firewall impide la conexión.
+   - Las redes de la facultad y algunas públicas aíslan los dispositivos entre sí. En ese caso,
+     se puede probar con el hotspot del teléfono.
 
-En la app, guardá la dirección de la API en una sola constante (por ejemplo
-`const API = 'http://192.168.0.10:3000'`) para cambiarla fácil.
+La app recibe la dirección de la API mediante `EXPO_PUBLIC_API_URL`. Para una prueba en un
+teléfono, se configura con la IP de la computadora; los pasos están en
+[`../frontend/README.md`](../frontend/README.md).
 
 Las URLs de las fotos y los videos que devuelve la API se arman con la misma dirección que
 usó el teléfono, así que funcionan sin configurar nada.
@@ -159,7 +161,7 @@ Todas las cuentas tienen la contraseña **`demo1234`**.
 | `nuevo@demo.ar` | pasajero | Una cuenta sin nada: para ver las listas vacías. |
 | `transporte@parana.demo.ar` | Dirección de Transporte | Publica avisos y ve el resumen de reportes. |
 
-Podés crear más cuentas con `POST /auth/registro`: siempre son de pasajero.
+Se pueden crear más cuentas con `POST /auth/registro`: siempre son de pasajero.
 
 **Cómo se usa la sesión:** `POST /auth/ingreso` devuelve un `token`. Guardalo con
 `expo-secure-store` (nunca en `kv-store`) y mandalo en cada pedido que lo necesite:
@@ -173,9 +175,9 @@ volver a ingresar.
 
 ## 5.1. Qué hay en los datos de demo
 
-Al arrancar (o con `pnpm db:reiniciar`) la API carga una red de juguete pero verosímil de
-Paraná. Los ids de los ejemplos del PRD son los mismos, para que tus pantallas se parezcan a
-las del documento.
+Al arrancar (o con `pnpm db:reiniciar`) la API carga una red de demo verosímil de
+Paraná. Los ids de los ejemplos del PRD son los mismos para facilitar la comparación con
+las pantallas del documento.
 
 | Qué | Cuánto | Detalle |
 |---|---|---|
@@ -200,7 +202,7 @@ uno próximo y uno terminado, aunque levantes la API otro día o congeles el rel
 | Un aviso próximo y uno terminado | `avi-091` (empieza en tres días) y `avi-092` (ya terminó): `GET /avisos?estado=todos`. |
 | Una línea inactiva | `lin-11`: no tiene servicio y no aparece en los próximos. |
 | Paradas sin refugio, y con y sin QR | `par-103` y `par-106` no tienen refugio; `par-104` y `par-108` no tienen QR. |
-| Una lista vacía | Entrá con `nuevo@demo.ar` (sin favoritos), o pedí los reportes de una parada que no tiene (todas salvo `par-101`). |
+| Una lista vacía | Ingresá con `nuevo@demo.ar` (sin favoritos) o consultá los reportes de una parada que no tiene (todas salvo `par-101`). |
 | Un reporte con foto | `rep-3394` (la foto se baja de `/archivos/...`). |
 | Un reporte viejo | `rep-3393`: pasaron más de 90 minutos, no se lista ni se puede confirmar. |
 | Un feriado que cae sábado | 20 de junio de 2026 (Belgrano): usa la tabla de feriado. |
@@ -208,7 +210,7 @@ uno próximo y uno terminado, aunque levantes la API otro día o congeles el rel
 
 El video y la foto de demo están generados en el código (sin derechos de terceros): el video
 es un MP4 mínimo, sirve para probar la descarga y el `Range`, pero no tiene imagen. Para ver
-imagen real, subí tu propio clip con `POST /archivos`.
+una imagen real, se puede subir un clip con `POST /archivos`.
 
 ## 6. Endpoints
 
@@ -253,9 +255,9 @@ imagen real, subí tu propio clip con `POST /archivos`.
 ### Subir fotos, audios y videos
 
 Los archivos se suben **antes** que el recurso: primero `POST /archivos` (con sesión,
-`multipart/form-data`, campo `archivo`), que devuelve la `url`; después mandás esa `url`
-en el recurso (por ejemplo, en `fotoUri` de un reporte). Así la cola sin conexión sube la
-foto cuando vuelve la señal y recién ahí el reporte.
+`multipart/form-data`, campo `archivo`), que devuelve la `url`; después se envía esa `url`
+en el recurso (por ejemplo, en `fotoUri` de un reporte). Así, la cola sin conexión sube la
+foto cuando vuelve la señal y luego envía el reporte.
 
 ```ts
 const formulario = new FormData();
@@ -280,7 +282,7 @@ hasta 30 MB. Los videos se pueden reproducir con `expo-video` directo desde la U
 
 1. Pedí permiso y obtené el token con `expo-notifications`.
 2. Registralo: `POST /dispositivos` con `{ "tokenExpo": "ExponentPushToken[…]", "plataforma": "android" }`.
-3. Probalo: `POST /dispositivos/prueba` te manda una notificación a vos.
+3. Prueba: `POST /dispositivos/prueba` envía una notificación al dispositivo registrado.
 4. Al cerrar sesión: `DELETE /dispositivos/<tokenExpo>`.
 
 La API manda push sólo cuando pasa algo en el servidor (por ejemplo, un aviso nuevo en una
@@ -290,12 +292,12 @@ la app: la API no las manda.
 
 ### Horarios y feriados
 
-- `GET /horarios` necesita `lineaId` o `paradaId`. Bajá la tabla entera con `porPagina=5000` y
-  guardala en el teléfono: tiene que servir sin señal.
-- Para elegir la tabla (`habil`, `sabado`, `domingo` o `feriado`) sin conexión, guardá también
+- `GET /horarios` necesita `lineaId` o `paradaId`. Descargá la tabla entera con `porPagina=5000` y
+  guardala en el teléfono para que esté disponible sin señal.
+- Para elegir la tabla (`habil`, `sabado`, `domingo` o `feriado`) sin conexión, guardar también
   `GET /feriados?anio=2026` y `?anio=2027`. **`Feriado` no está en el PRD:** está en
   [`contract/api.ts`](contract/api.ts). Un feriado gana sobre el sábado y el domingo.
-- `GET /paradas/:id/proximos` te da los siguientes pasos de cada línea. Si ya no hay más
+- `GET /paradas/:id/proximos` devuelve los siguientes pasos de cada línea. Si ya no hay más
   servicio hoy, vienen los de mañana a primera hora, con el `tipoDeDia` de mañana: se
   reconocen porque su `hora` es menor que la hora de ahora.
 - La API no sabe dónde está cada colectivo: son horas de tabla.
@@ -337,8 +339,8 @@ usalo para decidir qué hacer. El **mensaje** está en castellano y se puede mos
 
 ## 8. Probar errores, demoras y horarios
 
-Tu app tiene que mostrar bien los errores de red y los estados de carga. Para probarlo sin
-apagar el wifi, mandá la cabecera `X-Simular` en cualquier pedido:
+Nuestra app debe mostrar correctamente los errores de red y los estados de carga. Para probarlos
+sin apagar el wifi, se puede enviar la cabecera `X-Simular` en cualquier pedido:
 
 | Cabecera | Qué pasa |
 |---|---|
@@ -349,10 +351,10 @@ Anda con `SIMULACION_HABILITADA=true`, que es lo que viene en desarrollo y en Do
 
 **Congelar el reloj:** con `RELOJ_FIJO=2026-11-14T22:00:00-03:00` en el `.env` (o
 `RELOJ_FIJO=… docker compose up`), la API cree que siempre es ese momento. Sirve para ver
-qué muestra tu app cuando ya pasó el último colectivo del día, o un sábado, o un feriado.
+qué muestra la app cuando ya pasó el último colectivo del día, o durante un sábado o un feriado.
 
-La API manda en cada respuesta la cabecera `Date` con la hora del servidor: te sirve para
-decir "información de hace 2 horas" cuando mostrás datos guardados.
+La API incluye en cada respuesta la cabecera `Date` con la hora del servidor; sirve para
+indicar "información de hace 2 horas" al mostrar datos guardados.
 
 ## 9. Volver los datos al estado inicial
 
@@ -364,24 +366,24 @@ decir "información de hace 2 horas" cuando mostrás datos guardados.
 
 | Lo que pasa | Qué hacer |
 |---|---|
-| La API no arranca y dice qué variable falta | Leé el mensaje: dice qué poner. Copiá `.env.example` como `.env`. |
-| El teléfono no llega a la API | Mirá la sección 4: misma wifi, IP de la computadora, firewall. |
+| La API no arranca y dice qué variable falta | El mensaje indica qué variable falta. Copiar `.env.example` como `.env`. |
+| El teléfono no llega a la API | Consultá la sección 4: misma wifi, IP de la computadora y firewall. |
 | `Network request failed` en Android con `http://` | Expo Go permite `http`; en un build propio hay que habilitar el tráfico sin cifrar o usar la API publicada con `https`. |
-| `401 NO_AUTENTICADO` | Falta `Authorization: Bearer <token>`, o el token venció (30 días): volvé a ingresar. |
-| `pnpm install` se queja de `better-sqlite3` | Usá Node 24. En Windows, si igual falla, instalá las "Build Tools" de Visual Studio o usá Docker. |
-| `EADDRINUSE` (el puerto está ocupado) | Ya hay algo en el 3000 (¿otra API corriendo?). Cerrala o usá `PUERTO=4000`. |
-| Con XAMPP la base se comporta raro | Usá `DB_MOTOR=mariadb` (sección 3). |
+| `401 NO_AUTENTICADO` | Falta `Authorization: Bearer <token>`, o el token venció (30 días): iniciá sesión nuevamente. |
+| `pnpm install` se queja de `better-sqlite3` | Usar Node 24. En Windows, si igual falla, instalar las "Build Tools" de Visual Studio o usar Docker. |
+| `EADDRINUSE` (el puerto está ocupado) | Ya hay algo en el 3000 (¿otra API corriendo?). Cerrar ese proceso o usar `PUERTO=4000`. |
+| Con XAMPP la base se comporta raro | Configurar `DB_MOTOR=mariadb` (sección 3). |
 | Docker: `port is already allocated` | Otro programa usa ese puerto: `PUERTO=4000 docker compose up`. |
-| Publicada, la primera llamada tarda más de un minuto | Es normal en el plan gratis de Render: el servicio se duerme a los 15 minutos sin uso. Mostrá "cargando" en la app (sección 11). |
-| Supabase: la API no se conecta después de unos días | El plan gratis **pausa el proyecto** tras una semana sin uso: reactivalo desde el panel de Supabase. |
-| `No pudimos acceder a los archivos` (`ALMACEN_NO_DISPONIBLE`) | Probá `pnpm archivos:probar`: dice si fallan las credenciales, el bucket o la región. |
-| Quiero ver la base por dentro | Con Docker, conectate con DBeaver a los puertos de la sección 1. Con SQLite, abrí `datos/api.sqlite`. |
+| Publicada, la primera llamada tarda más de un minuto | Es normal en el plan gratis de Render: el servicio se duerme a los 15 minutos sin uso. La app debe mostrar "cargando" (sección 11). |
+| Supabase: la API no se conecta después de unos días | El plan gratis **pausa el proyecto** tras una semana sin uso: reactivar el proyecto desde el panel de Supabase. |
+| `No pudimos acceder a los archivos` (`ALMACEN_NO_DISPONIBLE`) | Ejecutá `pnpm archivos:probar`: el resultado indica si fallan las credenciales, el bucket o la región. |
+| Consultar la base por dentro | Con Docker, conectar DBeaver a los puertos de la sección 1. Con SQLite, abrir `datos/api.sqlite`. |
 
 ## 11. En la nube: publicar la API
 
-Con Docker o con `pnpm dev` la API corre en tu computadora. Para el **build de producción con
-EAS** necesitás una dirección `https://` que ande desde cualquier red: una app instalada no puede
-apuntar a la IP de tu notebook. La combinación gratis y sin tarjeta que probamos:
+Con Docker o con `pnpm dev` la API corre en la computadora local. Para el **build de producción con
+EAS** se necesita una dirección `https://` accesible desde cualquier red: una app instalada no puede
+apuntar a una IP local. La combinación gratuita y sin tarjeta utilizada:
 
 | Pieza | Servicio |
 |---|---|
@@ -394,15 +396,15 @@ Backblaze B2 o Amazon S3 para los archivos. Se elige con variables de entorno, s
 
 ### Paso a paso con Render + Supabase
 
-1. **Supabase**: creá un proyecto en <https://supabase.com> y guardá la contraseña de la base.
-2. **La base**: en el proyecto, botón **Connect** → **Session pooler** → copiá la cadena y poné tu
+1. **Supabase**: crear un proyecto en <https://supabase.com> y guardar la contraseña de la base.
+2. **La base**: en el proyecto, botón **Connect** → **Session pooler** → copiar la cadena e ingresar la
    contraseña. Tiene que tener `…pooler.supabase.com` y el puerto **5432**. (No sirve la conexión
-   directa, que es sólo IPv6, ni la del puerto 6543: la API te lo dice si te equivocás.)
-3. **El bucket**: **Storage** → **New bucket** → llamalo `archivos` (privado).
-4. **Las claves de archivos**: **Storage** → **S3 Connection** → **New access key**. Anotá
+   directa, que es sólo IPv6, ni la del puerto 6543: la API informa si la conexión es incorrecta.)
+3. **El bucket**: **Storage** → **New bucket** → asignar el nombre `archivos` (privado).
+4. **Las claves de archivos**: **Storage** → **S3 Connection** → **New access key**. Anotar
    `Access key ID`, `Secret access key` y la **Region** del proyecto.
-5. **Render**: <https://render.com> → **New** → **Blueprint** → elegí el repo de tu grupo. Render lee
-   `render.yaml` y te pide los datos que faltan:
+5. **Render**: <https://render.com> → **New** → **Blueprint** → seleccioná el repositorio del grupo.
+   Render lee `render.yaml` y solicita los datos que faltan:
 
    | Variable | Qué poner |
    |---|---|
@@ -413,13 +415,13 @@ Backblaze B2 o Amazon S3 para los archivos. Se elige con variables de entorno, s
    | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | las del paso 4 |
 
    `JWT_SECRETO` lo genera Render solo.
-6. Esperá el primer deploy (unos minutos). La API crea las tablas en el esquema `api` y carga los
+6. Esperar el primer deploy (unos minutos). La API crea las tablas en el esquema `api` y carga los
    datos de demo sola.
-7. **Probala** desde tu computadora: `pnpm publicado:probar https://tu-api.onrender.com`. Revisa
-   `/salud`, que haya datos y que las URLs de los archivos sean `https://` y respondan.
+7. **Verificación** desde una terminal: `pnpm publicado:probar https://api-publicada.onrender.com`.
+   Revisá `/salud`, la presencia de datos y que las URLs de los archivos usen `https://` y respondan.
 
-> Si el repo es tuyo, también podés usar el botón
-> `https://render.com/deploy?repo=https://github.com/<tu-usuario>/<tu-repo>`.
+> También se puede usar el botón
+> `https://render.com/deploy?repo=https://github.com/<organizacion>/<repositorio>`.
 
 ### Cosas que conviene saber
 
@@ -433,14 +435,14 @@ Backblaze B2 o Amazon S3 para los archivos. Se elige con variables de entorno, s
 - Con `ENTORNO=publicado` la API **no arranca** si dejaste SQLite, archivos en disco, el
   `JWT_SECRETO` de desarrollo (o uno de menos de 32 caracteres) o la simulación de errores. El
   mensaje dice qué cambiar.
-- Los archivos subidos se ven siempre por `https://<tu-api>/archivos/…`: la app no sabe dónde están guardados.
+- Los archivos subidos se ven siempre por `https://<api-publicada>/archivos/…`: la app no sabe dónde están guardados.
 - Para volver los datos de demo a cero en la nube: `pnpm db:reiniciar --confirmar` con el `.env`
   apuntando a esa base. Borra **sólo el esquema `api`**, nunca otros (en Supabase conviven `auth`, `storage`…).
 
-### Probar tu configuración antes de publicar
+### Verificar la configuración antes de publicar
 
-Poné las variables en el `.env` (el `.env.example` trae un bloque por proveedor, con dónde
-conseguir cada dato) y corré:
+Indicá las variables en el `.env` (el `.env.example` trae un bloque por proveedor y explica
+dónde conseguir cada dato) y ejecutá:
 
 | Comando | Qué hace |
 |---|---|
@@ -451,7 +453,8 @@ conseguir cada dato) y corré:
 Variables de la base: `DB_PROVEEDOR` (`supabase`, `neon`, `aiven-postgres`, `aiven-mysql`), `DB_URL`,
 `DB_SSL` (`no`, `si`, `si-sin-verificar`), `DB_SSL_CA` y `DB_ESQUEMA`. Variables de los archivos:
 `ARCHIVOS_PROVEEDOR` (`local`, `supabase`, `aws`, `r2`, `b2`, `s3proxy`, `localstack`) y sus `S3_*`.
-Si el servidor rechaza el certificado, la API te dice si usar `DB_SSL=si-sin-verificar` o poner la CA en `DB_SSL_CA`.
+Si el servidor rechaza el certificado, el mensaje de la API indica si corresponde usar
+`DB_SSL=si-sin-verificar` o configurar la CA en `DB_SSL_CA`.
 
 ---
 
@@ -460,3 +463,10 @@ proyecto en `docs/SPECIFICATION.md` y las decisiones sobre los huecos del PRD en
 `docs/DECISIONS.md`. `pnpm verificar` corre tipos, lint y todos los tests;
 `pnpm test:e2e:matriz` corre los e2e contra los cuatro motores (y los archivos contra S3Proxy) y
 `pnpm docker:probar` prueba los compose.
+
+## Equipo
+
+- Luciano Cirvini
+- Sofia Guardia
+- Mariano Jimenez
+- Macarena Schefer
